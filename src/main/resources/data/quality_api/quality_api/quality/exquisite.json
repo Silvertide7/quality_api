@@ -1,0 +1,12 @@
+{
+  "level": 3,
+  "color": "#17DD62",
+  "weight": 2,
+  "effects": {
+    "durability_multiplier": 1.45,
+    "mining_speed_multiplier": 1.35,
+    "enchantment_levels": {
+      "minecraft:unbreaking": 1
+    }
+  }
+}

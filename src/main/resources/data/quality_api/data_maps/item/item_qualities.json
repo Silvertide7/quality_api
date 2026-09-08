@@ -1,0 +1,306 @@
+{
+  "values": {
+    "#minecraft:swords": {
+      "quality_api:crude": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.attack_damage",
+            "operation": "add_value",
+            "amount": -1.0
+          }
+        ]
+      },
+      "quality_api:fine": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.attack_damage",
+            "operation": "add_value",
+            "amount": 0.5
+          }
+        ]
+      },
+      "quality_api:superior": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.attack_damage",
+            "operation": "add_value",
+            "amount": 1.0
+          }
+        ]
+      },
+      "quality_api:exquisite": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.attack_damage",
+            "operation": "add_value",
+            "amount": 1.5
+          }
+        ]
+      },
+      "quality_api:masterwork": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.attack_damage",
+            "operation": "add_value",
+            "amount": 2.0
+          }
+        ]
+      }
+    },
+    "#minecraft:axes": {
+      "quality_api:crude": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.attack_damage",
+            "operation": "add_value",
+            "amount": -1.0
+          }
+        ]
+      },
+      "quality_api:fine": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.attack_damage",
+            "operation": "add_value",
+            "amount": 0.5
+          }
+        ]
+      },
+      "quality_api:superior": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.attack_damage",
+            "operation": "add_value",
+            "amount": 1.0
+          }
+        ]
+      },
+      "quality_api:exquisite": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.attack_damage",
+            "operation": "add_value",
+            "amount": 1.5
+          }
+        ]
+      },
+      "quality_api:masterwork": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.attack_damage",
+            "operation": "add_value",
+            "amount": 2.0
+          }
+        ]
+      }
+    },
+    "#minecraft:head_armor": {
+      "quality_api:crude": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": -1.0,
+            "slot": "head"
+          }
+        ]
+      },
+      "quality_api:fine": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 0.5,
+            "slot": "head"
+          }
+        ]
+      },
+      "quality_api:superior": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 1.0,
+            "slot": "head"
+          }
+        ]
+      },
+      "quality_api:exquisite": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 1.5,
+            "slot": "head"
+          }
+        ]
+      },
+      "quality_api:masterwork": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 2.0,
+            "slot": "head"
+          }
+        ]
+      }
+    },
+    "#minecraft:chest_armor": {
+      "quality_api:crude": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": -1.0,
+            "slot": "chest"
+          }
+        ]
+      },
+      "quality_api:fine": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 0.5,
+            "slot": "chest"
+          }
+        ]
+      },
+      "quality_api:superior": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 1.0,
+            "slot": "chest"
+          }
+        ]
+      },
+      "quality_api:exquisite": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 1.5,
+            "slot": "chest"
+          }
+        ]
+      },
+      "quality_api:masterwork": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 2.0,
+            "slot": "chest"
+          }
+        ]
+      }
+    },
+    "#minecraft:leg_armor": {
+      "quality_api:crude": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": -1.0,
+            "slot": "legs"
+          }
+        ]
+      },
+      "quality_api:fine": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 0.5,
+            "slot": "legs"
+          }
+        ]
+      },
+      "quality_api:superior": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 1.0,
+            "slot": "legs"
+          }
+        ]
+      },
+      "quality_api:exquisite": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 1.5,
+            "slot": "legs"
+          }
+        ]
+      },
+      "quality_api:masterwork": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 2.0,
+            "slot": "legs"
+          }
+        ]
+      }
+    },
+    "#minecraft:foot_armor": {
+      "quality_api:crude": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": -1.0,
+            "slot": "feet"
+          }
+        ]
+      },
+      "quality_api:fine": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 0.5,
+            "slot": "feet"
+          }
+        ]
+      },
+      "quality_api:superior": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 1.0,
+            "slot": "feet"
+          }
+        ]
+      },
+      "quality_api:exquisite": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 1.5,
+            "slot": "feet"
+          }
+        ]
+      },
+      "quality_api:masterwork": {
+        "attributes": [
+          {
+            "type": "minecraft:generic.armor",
+            "operation": "add_value",
+            "amount": 2.0,
+            "slot": "feet"
+          }
+        ]
+      }
+    }
+  }
+}

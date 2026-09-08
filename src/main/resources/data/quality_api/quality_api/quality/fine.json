@@ -1,0 +1,9 @@
+{
+  "level": 1,
+  "color": "#E77C56",
+  "weight": 15,
+  "effects": {
+    "durability_multiplier": 1.15,
+    "mining_speed_multiplier": 1.1
+  }
+}
