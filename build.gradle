@@ -3,6 +3,7 @@ plugins {
     id 'maven-publish'
     id 'net.neoforged.moddev' version '2.0.146'
     id 'idea'
+    id "me.modmuss50.mod-publish-plugin" version "0.8.3"
 }
 
 tasks.named('wrapper', Wrapper).configure {
@@ -165,16 +166,42 @@ sourceSets.main.resources.srcDir generateModMetadata
 // To avoid having to run "generateModMetadata" manually, make it run on every project reload
 neoForge.ideSyncTask generateModMetadata
 
-// Example configuration to allow publishing using the maven-publish plugin
-publishing {
-    publications {
-        register('mavenJava', MavenPublication) {
-            from components.java
-        }
+publishMods {
+    file = jar.archiveFile
+    modLoaders.add("neoforge")
+    changelog = new File("$project.rootDir/CHANGELOG.md").getText('UTF-8')
+    version = "${minecraft_version}-${mod_version}"
+    type = STABLE
+    displayName = "qualityapi-${minecraft_version}-${mod_version}"
+    dryRun = System.getenv("PUBLISH_DRY_RUN") == "true"
+
+    curseforge {
+        projectId = "${curseforge_project}"
+        projectSlug = "qualityapi"
+        accessToken = providers.environmentVariable("CF_TOKEN")
+
+        minecraftVersions.add(minecraft_version)
+        javaVersions.add(JavaVersion.VERSION_21)
+
+        clientRequired = true
+        serverRequired = true
     }
-    repositories {
-        maven {
-            url "file://${project.projectDir}/repo"
+
+    // Modrinth: enable when the mod is published there.
+    // modrinth {
+    //     projectId = "<modrinth-project-id>"
+    //     accessToken = providers.environmentVariable("MODRINTH_TOKEN")
+    //     minecraftVersions.add(minecraft_version)
+    // }
+
+    discord {
+        webhookUrl = providers.environmentVariable("DISCORD_WEBHOOK_URL")
+        dryRunWebhookUrl = providers.environmentVariable("DISCORD_WEBHOOK_TEST_URL")
+        username = "QualityAPI"
+        style {
+            look = "MODERN"
+            color = "curseforge"
+            link = "EMBED"
         }
     }
 }
