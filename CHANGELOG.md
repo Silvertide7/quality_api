@@ -1,3 +1,3 @@
-1.1.0
+1.1.1
 ---
-- Finish full implementation.
+- Change tooltips to no longer color item title and put crafted by on same line as quality

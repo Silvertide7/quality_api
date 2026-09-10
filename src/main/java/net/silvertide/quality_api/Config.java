@@ -48,10 +48,6 @@ public final class Config {
             .comment("Show the quality tier and crafter lines in item tooltips.")
             .define("showQualityTooltip", true);
 
-    public static final ModConfigSpec.BooleanValue COLOR_ITEM_NAME = CLIENT
-            .comment("Colour the item name in tooltips with the quality tier colour.")
-            .define("colorItemName", true);
-
     public static final ModConfigSpec CLIENT_SPEC = CLIENT.build();
 
     private Config() {}
