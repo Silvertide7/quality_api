@@ -32,7 +32,7 @@ public final class ClientEvents {
         List<Component> lines = event.getToolTip();
         int insertAt = 1;
         if (Config.SHOW_QUALITY_TOOLTIP.get()) {
-            Component tierName = quality.level() == 0 ? null : Qualities.displayName(tier);
+            Component tierName = Config.HIDDEN_TOOLTIP_TIERS.get().contains(tier.toString()) ? null : Qualities.displayName(tier);
             Component qualityLine = qualityLine(tierName, stack.get(QualityAPI.CRAFTER.get()));
             if (qualityLine != null) insertAt = insert(lines, insertAt, qualityLine);
         }

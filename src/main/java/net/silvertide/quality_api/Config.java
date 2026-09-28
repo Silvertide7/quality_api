@@ -1,6 +1,9 @@
 package net.silvertide.quality_api;
 
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.common.ModConfigSpec;
+
+import java.util.List;
 
 public final class Config {
     public enum Inheritance { HIGHEST, LOWEST, AVERAGE, NONE }
@@ -47,6 +50,10 @@ public final class Config {
     public static final ModConfigSpec.BooleanValue SHOW_QUALITY_TOOLTIP = CLIENT
             .comment("Show the quality tier and crafter lines in item tooltips.")
             .define("showQualityTooltip", true);
+
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> HIDDEN_TOOLTIP_TIERS = CLIENT
+            .comment("Quality tier ids whose name is left out of item tooltips, e.g. [\"quality_api:standard\"].")
+            .defineListAllowEmpty("hiddenTooltipTiers", List.of(), () -> "", entry -> entry instanceof String id && ResourceLocation.tryParse(id) != null);
 
     public static final ModConfigSpec CLIENT_SPEC = CLIENT.build();
 
