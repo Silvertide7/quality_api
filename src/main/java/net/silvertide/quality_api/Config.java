@@ -13,7 +13,7 @@ public final class Config {
     public static final ModConfigSpec.EnumValue<Inheritance> CRAFT_INHERITANCE = COMMON
             .comment("How a crafted item's quality is derived from ingredients that carry quality.",
                     "HIGHEST/LOWEST pick that ingredient's tier, AVERAGE takes the mean level and rolls the fractional part up or down, NONE ignores ingredients.")
-            .defineEnum("craftInheritance", Inheritance.HIGHEST);
+            .defineEnum("craftInheritance", Inheritance.AVERAGE);
 
     public static final ModConfigSpec.BooleanValue CRAFT_INHERITANCE_DAMAGEABLE_ONLY = COMMON
             .comment("Only crafted results with durability inherit quality from ingredients. Off lets planks, sticks and other stackables carry quality too.")
