@@ -9,12 +9,15 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
+import net.silvertide.quality_api.api.QualityBreakDowngradeEvent;
+import net.silvertide.quality_api.api.QualityItemBrokenEvent;
 import net.silvertide.quality_api.quality.Snapshot;
 import org.jetbrains.annotations.Nullable;
 
@@ -41,9 +44,12 @@ public final class BrokenItems {
         float downgradeChance = resolved.breakDowngradeChance().orElseGet(() -> Config.BREAK_DOWNGRADE_CHANCE.get().floatValue());
         boolean mayDowngrade = Config.HIGHEST_TIER_CAN_DOWNGRADE.get() || !Qualities.isHighestLevel(stack, tier);
         if (mayDowngrade && level.getRandom().nextFloat() < downgradeChance) {
-            Qualities.shift(stack, tier, -1).ifPresent(lower -> Qualities.apply(stack, lower));
+            Qualities.shift(stack, tier, -1)
+                    .filter(lower -> !NeoForge.EVENT_BUS.post(new QualityBreakDowngradeEvent(stack, entity, tier, lower)).isCanceled())
+                    .ifPresent(lower -> Qualities.apply(stack, lower));
         }
         stack.set(DataComponents.DAMAGE, stack.getMaxDamage());
+        NeoForge.EVENT_BUS.post(new QualityItemBrokenEvent(stack, entity, stack.getOrDefault(QualityAPI.QUALITY.get(), tier)));
         if (entity != null) playBreakSound(level, entity);
         return true;
     }
