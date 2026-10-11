@@ -191,6 +191,8 @@ publishMods {
 
         clientRequired = true
         serverRequired = true
+
+        requires("silverlib")
     }
 
     // Modrinth: enable when the mod is published there.
