@@ -10,6 +10,7 @@ import net.minecraft.world.item.ItemStack;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.quality.Quality;
 import net.silvertide.quality_api.quality.Snapshot;
+import net.silvertide.silverlib.feature.breakage.BrokenItems;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,7 +70,7 @@ public final class Qualities {
     }
 
     public static boolean isBroken(ItemStack stack) {
-        return getId(stack).isPresent() && stack.isDamageableItem() && stack.getDamageValue() >= stack.getMaxDamage();
+        return getId(stack).isPresent() && BrokenItems.isBroken(stack);
     }
 
     public static boolean isHighestLevel(ItemStack stack, ResourceLocation id) {

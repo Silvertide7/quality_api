@@ -37,10 +37,12 @@ import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
 import net.silvertide.quality_api.api.QualityCraftEvent;
+import net.silvertide.quality_api.api.QualityItemBrokenEvent;
 import net.silvertide.quality_api.craft.MinQualityIngredient;
 import net.silvertide.quality_api.quality.QualityEffects;
 import net.silvertide.quality_api.quality.Snapshot;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -152,12 +154,21 @@ public class QualityGameTests {
         pickaxe.set(QualityAPI.QUALITY.get(), MASTERWORK);
         helper.assertTrue(pickaxe.getEnchantmentLevel(unbreaking) == 2, "masterwork should grant Unbreaking II, got " + pickaxe.getEnchantmentLevel(unbreaking));
 
-        pickaxe.setDamageValue(pickaxe.getMaxDamage());
-        helper.assertTrue(pickaxe.getEnchantmentLevel(unbreaking) == 0, "broken item should lose bonus enchantments");
+        double previousChance = Config.BREAK_DOWNGRADE_CHANCE.get();
+        Config.BREAK_DOWNGRADE_CHANCE.set(0.0);
+        try {
+            pickaxe.setDamageValue(pickaxe.getMaxDamage() - 1);
+            pickaxe.hurtAndBreak(DAMAGE_FAR_BEYOND_REMAINING, helper.getLevel(), (LivingEntity) null, item -> {});
+            helper.assertTrue(MASTERWORK.equals(Qualities.getId(pickaxe).orElse(null)), "masterwork should keep its tier with downgrade chance 0");
+            helper.assertTrue(pickaxe.getEnchantmentLevel(unbreaking) == 0, "broken item should lose bonus enchantments");
 
-        ItemStack sword = withQuality(Items.IRON_SWORD, MASTERWORK);
-        sword.setDamageValue(sword.getMaxDamage());
-        helper.assertTrue(sword.getAttributeModifiers().modifiers().isEmpty(), "broken item should have no attribute modifiers");
+            ItemStack sword = withQuality(Items.IRON_SWORD, MASTERWORK);
+            sword.setDamageValue(sword.getMaxDamage() - 1);
+            sword.hurtAndBreak(DAMAGE_FAR_BEYOND_REMAINING, helper.getLevel(), (LivingEntity) null, item -> {});
+            helper.assertTrue(sword.getAttributeModifiers().modifiers().isEmpty(), "broken item should have no attribute modifiers");
+        } finally {
+            Config.BREAK_DOWNGRADE_CHANCE.set(previousChance);
+        }
         helper.succeed();
     }
 
@@ -182,6 +193,37 @@ public class QualityGameTests {
         helper.assertTrue(!pickaxe.isEmpty(), "crude pickaxe was destroyed");
         helper.assertTrue(Qualities.isBroken(pickaxe), "crude pickaxe is not broken");
         helper.assertTrue(CRUDE.equals(Qualities.getId(pickaxe).orElse(null)), "lowest tier should not change");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void breakingPostsQualityItemBrokenEvent(GameTestHelper helper) {
+        List<ResourceLocation> brokenTiers = new ArrayList<>();
+        Consumer<QualityItemBrokenEvent> recordBrokenTier = event -> brokenTiers.add(event.getQuality());
+        NeoForge.EVENT_BUS.addListener(recordBrokenTier);
+        try {
+            breakFresh(helper, CRUDE);
+        } finally {
+            NeoForge.EVENT_BUS.unregister(recordBrokenTier);
+        }
+        helper.assertTrue(brokenTiers.equals(List.of(CRUDE)), "expected one QualityItemBrokenEvent for crude, got " + brokenTiers);
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void itemBrokenBeforeSilverLibIsKeptWithoutRerolling(GameTestHelper helper) {
+        double previousChance = Config.BREAK_DOWNGRADE_CHANCE.get();
+        Config.BREAK_DOWNGRADE_CHANCE.set(1.0);
+        try {
+            ItemStack pickaxe = withQuality(Items.DIAMOND_PICKAXE, MASTERWORK);
+            pickaxe.setDamageValue(pickaxe.getMaxDamage());
+            helper.assertTrue(!Qualities.isBroken(pickaxe), "an unmarked item at max damage is not yet SilverLib-broken");
+            pickaxe.hurtAndBreak(DAMAGE_FAR_BEYOND_REMAINING, helper.getLevel(), (LivingEntity) null, item -> {});
+            helper.assertTrue(!pickaxe.isEmpty() && Qualities.isBroken(pickaxe), "legacy broken item should be kept broken");
+            helper.assertTrue(MASTERWORK.equals(Qualities.getId(pickaxe).orElse(null)), "legacy broken item must not roll a second downgrade");
+        } finally {
+            Config.BREAK_DOWNGRADE_CHANCE.set(previousChance);
+        }
         helper.succeed();
     }
 

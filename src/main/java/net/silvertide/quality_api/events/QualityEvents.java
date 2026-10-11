@@ -47,12 +47,7 @@ public final class QualityEvents {
     static void onItemAttributes(ItemAttributeModifierEvent event) {
         ItemStack stack = event.getItemStack();
         Snapshot.Resolved resolved = resolvedFor(stack);
-        if (resolved == null) return;
-        if (Qualities.isBroken(stack)) {
-            event.clearModifiers();
-            return;
-        }
-        if (resolved.attributes().length == 0) return;
+        if (resolved == null || resolved.attributes().length == 0) return;
         EquipmentSlotGroup fallbackSlot = equipmentSlotOf(stack);
         for (Snapshot.BakedAttribute attribute : resolved.attributes()) {
             EquipmentSlotGroup slot = attribute.slot() != null ? attribute.slot() : fallbackSlot;
@@ -69,12 +64,7 @@ public final class QualityEvents {
     static void onBreakSpeed(PlayerEvent.BreakSpeed event) {
         ItemStack stack = event.getEntity().getMainHandItem();
         Snapshot.Resolved resolved = resolvedFor(stack);
-        if (resolved == null) return;
-        if (Qualities.isBroken(stack)) {
-            event.setNewSpeed(0.0F);
-            return;
-        }
-        if (resolved.miningSpeedMultiplier() == 1.0F) return;
+        if (resolved == null || resolved.miningSpeedMultiplier() == 1.0F) return;
         event.setNewSpeed(event.getNewSpeed() * resolved.miningSpeedMultiplier());
     }
 

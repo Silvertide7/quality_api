@@ -32,7 +32,7 @@ public final class Config {
             .define("recordCrafter", true);
 
     public static final ModConfigSpec.BooleanValue BROKEN_INSTEAD_OF_DESTROYED = COMMON
-            .comment("Quality items that reach zero durability become broken and unusable until repaired instead of being destroyed.")
+            .comment("Quality items that reach zero durability become broken and unusable until repaired instead of being destroyed. Turning this off only affects future breaks: items already broken stay broken until repaired.")
             .define("brokenInsteadOfDestroyed", true);
 
     public static final ModConfigSpec.DoubleValue BREAK_DOWNGRADE_CHANCE = COMMON

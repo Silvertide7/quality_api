@@ -12,8 +12,11 @@ Quality API targets NeoForge 1.21.1. All public API lives in `net.silvertide.qua
 dependencies {
     compileOnly "net.silvertide.quality_api:quality_api:${quality_api_version}"
     localRuntime "net.silvertide.quality_api:quality_api:${quality_api_version}"
+    localRuntime "curse.maven:silverlib-1691772:${silverlib_version}"
 }
 ```
+
+Quality API requires SilverLib at runtime, and it is not pulled in transitively, so add it to `localRuntime` yourself (from [CurseMaven](https://cursemaven.com), with the `curse.maven` repository) or your dev runs fail with a missing `silver_lib` dependency.
 
 Use `implementation` instead if your mod cannot function without it. In `neoforge.mods.toml`:
 
@@ -32,7 +35,7 @@ side = "BOTH"
 - Tiers are a datapack registry. Each has an integer `level` (0 is the silent baseline, negative is worse), a colour, a roll `weight`, an optional `items` filter, and default `effects`.
 - Effects (durability multiplier, mining speed, attribute modifiers, bonus enchantment levels, break behaviour) are computed live from the tier every time they are needed. You never bake anything onto the item.
 - Per-item and per-tag patches to those effects live in a NeoForge data map. You can ship entries for your own items.
-- A quality item at zero durability becomes broken instead of vanishing, and may drop a tier. You get this for free.
+- A quality item at zero durability becomes broken instead of vanishing, and may drop a tier. You get this for free. The broken state comes from SilverLib (a required dependency); to keep your own non-quality items broken, listen to SilverLib's `ItemBreakingEvent` and call `keepBroken()`. Cancel `QualityBreakDowngradeEvent` to stop a tier drop, and listen to `QualityItemBrokenEvent` to react after a quality item breaks. `break_destroy_chance` means Quality API does not ask to keep the item; if another mod keeps it through SilverLib, it is kept anyway.
 
 Work in **levels**, not tier ids. Packs rename, remove, and add tiers. Your code should compute an integer or fractional level and let the API pick the tier.
 
@@ -91,7 +94,7 @@ if (chosen != null && Qualities.apply(result, chosen)) {
 
 - `Qualities.level(stack)` is the integer level, 0 when the item has none. Most gameplay code needs nothing else.
 - `Qualities.getId(stack)` and `Qualities.get(stack)` give the tier id or the full tier definition when you need colour or weight.
-- `Qualities.isBroken(stack)` tells you the item is at zero durability and unusable.
+- `Qualities.isBroken(stack)` tells you the item has a quality and SilverLib is keeping it broken (its broken marker is set and it is at zero durability), so it is unusable until repaired. Setting damage to max by hand does not make an item broken.
 - `Qualities.shift(stack, id, steps)` moves up or down to the next tier the item can take. `Qualities.isHighestLevel(stack, id)` tells you there is nothing above for that item.
 - `Qualities.idsByLevel()` lists all loaded tiers in ascending level order if you need to iterate.
 
