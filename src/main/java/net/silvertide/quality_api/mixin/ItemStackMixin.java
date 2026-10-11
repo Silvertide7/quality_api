@@ -24,6 +24,11 @@ public abstract class ItemStackMixin {
         QualityBreakEvents.rememberIfBrokenBeforeSilverLib((ItemStack) (Object) this);
     }
 
+    @Inject(method = "hurtAndBreak(ILnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/entity/LivingEntity;Ljava/util/function/Consumer;)V", at = @At("RETURN"))
+    private void quality_api$forgetStackAfterBeingDamaged(int damage, ServerLevel level, @Nullable LivingEntity entity, Consumer<Item> onBreak, CallbackInfo ci) {
+        QualityBreakEvents.forgetStackAfterBeingDamaged((ItemStack) (Object) this);
+    }
+
     @ModifyReturnValue(method = "getMaxDamage", at = @At("RETURN"))
     private int quality_api$scaleMaxDamage(int original) {
         if (original <= 0 || !QualityAPI.QUALITY.isBound()) return original;

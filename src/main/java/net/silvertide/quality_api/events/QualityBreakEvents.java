@@ -1,5 +1,6 @@
 package net.silvertide.quality_api.events;
 
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -46,8 +47,13 @@ public final class QualityBreakEvents {
     private static boolean isBrokenBeforeSilverLib(ItemStack stack) {
         return Qualities.getId(stack).isPresent()
                 && stack.isDamageableItem()
-                && stack.getDamageValue() >= stack.getMaxDamage()
+                && stack.getOrDefault(DataComponents.DAMAGE, 0) == stack.getMaxDamage()
                 && !BrokenItems.isBroken(stack);
+    }
+
+    public static void forgetStackAfterBeingDamaged(ItemStack stack) {
+        STACKS_BROKEN_BEFORE_SILVERLIB_BEING_DAMAGED.get().remove(stack);
+        STACKS_CONVERTED_FROM_BEFORE_SILVERLIB.get().remove(stack);
     }
 
     private static void convertIfBrokenBeforeSilverLib(ItemStack stack, ServerLevel level) {
@@ -73,6 +79,10 @@ public final class QualityBreakEvents {
     @SubscribeEvent
     static void onItemBreaking(ItemBreakingEvent event) {
         ItemStack stack = event.getStack();
+        if (BrokenItems.isBroken(stack)) {
+            event.keepBroken();
+            return;
+        }
         boolean wasBrokenBeforeSilverLib = STACKS_BROKEN_BEFORE_SILVERLIB_BEING_DAMAGED.get().remove(stack);
         if (!Config.BROKEN_INSTEAD_OF_DESTROYED.get()) return;
         ResourceLocation tier = stack.get(QualityAPI.QUALITY.get());

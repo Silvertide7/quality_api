@@ -87,7 +87,7 @@ config="${mod_id}.mixins.json"
 [[dependencies.${mod_id}]]
     modId="silver_lib"
     type="required"
-    versionRange="[1.2.0,)"
+    versionRange="[1.2.1,)"
     ordering="AFTER"
     side="BOTH"
 
