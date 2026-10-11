@@ -1,5 +1,6 @@
 package net.silvertide.quality_api.gametest;
 
+import com.mojang.authlib.GameProfile;
 import com.mojang.datafixers.util.Either;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -15,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -31,6 +33,9 @@ import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.util.FakePlayerFactory;
+import net.neoforged.neoforge.event.entity.living.LivingEquipmentChangeEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.silvertide.quality_api.Config;
@@ -47,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 @GameTestHolder(QualityAPI.MOD_ID)
@@ -213,7 +219,12 @@ public class QualityGameTests {
     @GameTest(template = EMPTY)
     public static void itemBrokenBeforeSilverLibIsKeptWithoutRerolling(GameTestHelper helper) {
         double previousChance = Config.BREAK_DOWNGRADE_CHANCE.get();
+        boolean previousHighest = Config.HIGHEST_TIER_CAN_DOWNGRADE.get();
         Config.BREAK_DOWNGRADE_CHANCE.set(1.0);
+        Config.HIGHEST_TIER_CAN_DOWNGRADE.set(true);
+        List<ResourceLocation> brokenTiers = new ArrayList<>();
+        Consumer<QualityItemBrokenEvent> recordBrokenTier = event -> brokenTiers.add(event.getQuality());
+        NeoForge.EVENT_BUS.addListener(recordBrokenTier);
         try {
             ItemStack pickaxe = withQuality(Items.DIAMOND_PICKAXE, MASTERWORK);
             pickaxe.setDamageValue(pickaxe.getMaxDamage());
@@ -221,9 +232,34 @@ public class QualityGameTests {
             pickaxe.hurtAndBreak(DAMAGE_FAR_BEYOND_REMAINING, helper.getLevel(), (LivingEntity) null, item -> {});
             helper.assertTrue(!pickaxe.isEmpty() && Qualities.isBroken(pickaxe), "legacy broken item should be kept broken");
             helper.assertTrue(MASTERWORK.equals(Qualities.getId(pickaxe).orElse(null)), "legacy broken item must not roll a second downgrade");
+            helper.assertTrue(brokenTiers.isEmpty(), "converting a legacy broken item must not post QualityItemBrokenEvent");
         } finally {
+            NeoForge.EVENT_BUS.unregister(recordBrokenTier);
             Config.BREAK_DOWNGRADE_CHANCE.set(previousChance);
+            Config.HIGHEST_TIER_CAN_DOWNGRADE.set(previousHighest);
         }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void loginAndEquipConvertItemsBrokenBeforeSilverLib(GameTestHelper helper) {
+        ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), new GameProfile(UUID.randomUUID(), "legacy-broken-test"));
+        ItemStack pickaxe = withQuality(Items.DIAMOND_PICKAXE, MASTERWORK);
+        pickaxe.setDamageValue(pickaxe.getMaxDamage());
+        ItemStack unknownTierPickaxe = new ItemStack(Items.DIAMOND_PICKAXE);
+        unknownTierPickaxe.set(QualityAPI.QUALITY.get(), QualityAPI.id("tier_that_does_not_exist"));
+        unknownTierPickaxe.setDamageValue(unknownTierPickaxe.getMaxDamage());
+        player.getInventory().setItem(0, pickaxe);
+        player.getInventory().setItem(1, unknownTierPickaxe);
+
+        NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedInEvent(player));
+        helper.assertTrue(Qualities.isBroken(pickaxe), "login should convert a legacy broken quality item");
+        helper.assertTrue(player.getInventory().getItem(1) == unknownTierPickaxe && !unknownTierPickaxe.isEmpty(), "login must not destroy an item whose tier is unknown");
+
+        ItemStack chestplate = withQuality(Items.DIAMOND_CHESTPLATE, MASTERWORK);
+        chestplate.setDamageValue(chestplate.getMaxDamage());
+        NeoForge.EVENT_BUS.post(new LivingEquipmentChangeEvent(player, EquipmentSlot.CHEST, ItemStack.EMPTY, chestplate));
+        helper.assertTrue(Qualities.isBroken(chestplate) && MASTERWORK.equals(Qualities.getId(chestplate).orElse(null)), "equipping should convert a legacy broken item without a downgrade");
         helper.succeed();
     }
 

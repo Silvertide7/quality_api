@@ -19,7 +19,6 @@ import net.neoforged.neoforge.event.enchanting.GetEnchantmentLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.registries.datamaps.DataMapsUpdatedEvent;
 import net.silvertide.quality_api.QualityAPI;
-import net.silvertide.quality_api.api.Qualities;
 import net.silvertide.quality_api.command.QualityCommand;
 import net.silvertide.quality_api.quality.Snapshot;
 import org.jetbrains.annotations.Nullable;
@@ -72,7 +71,7 @@ public final class QualityEvents {
     static void onEnchantmentLevel(GetEnchantmentLevelEvent event) {
         ItemStack stack = event.getStack();
         Snapshot.Resolved resolved = resolvedFor(stack);
-        if (resolved == null || resolved.enchantmentLevels().isEmpty() || Qualities.isBroken(stack)) return;
+        if (resolved == null || resolved.enchantmentLevels().isEmpty()) return;
         ItemEnchantments.Mutable enchantments = event.getEnchantments();
         Holder<Enchantment> target = event.getTargetEnchant();
         if (target != null) {

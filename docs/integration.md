@@ -14,9 +14,16 @@ dependencies {
     localRuntime "net.silvertide.quality_api:quality_api:${quality_api_version}"
     localRuntime "curse.maven:silverlib-1691772:${silverlib_version}"
 }
+
+repositories {
+    maven {
+        url 'https://cursemaven.com'
+        content { includeGroup 'curse.maven' }
+    }
+}
 ```
 
-Quality API requires SilverLib at runtime, and it is not pulled in transitively, so add it to `localRuntime` yourself (from [CurseMaven](https://cursemaven.com), with the `curse.maven` repository) or your dev runs fail with a missing `silver_lib` dependency.
+Quality API requires SilverLib at runtime, and it is not pulled in transitively, so add it to `localRuntime` yourself or your dev runs fail with a missing `silver_lib` dependency. If your code listens to SilverLib's events (for example `ItemBreakingEvent`), also add `compileOnly "curse.maven:silverlib-1691772:${silverlib_version}"`.
 
 Use `implementation` instead if your mod cannot function without it. In `neoforge.mods.toml`:
 
@@ -94,7 +101,7 @@ if (chosen != null && Qualities.apply(result, chosen)) {
 
 - `Qualities.level(stack)` is the integer level, 0 when the item has none. Most gameplay code needs nothing else.
 - `Qualities.getId(stack)` and `Qualities.get(stack)` give the tier id or the full tier definition when you need colour or weight.
-- `Qualities.isBroken(stack)` tells you the item has a quality and SilverLib is keeping it broken (its broken marker is set and it is at zero durability), so it is unusable until repaired. Setting damage to max by hand does not make an item broken.
+- `Qualities.isBroken(stack)` tells you the item has a quality and SilverLib is keeping it broken (its broken marker is set and it is at zero durability), so it is unusable until repaired. Setting damage to max by hand does not make an item broken straight away; Quality API treats an unmarked quality item at max damage as broken (keeping it, without a destroy or downgrade roll) the next time it takes damage, is equipped, or its holder logs in. That is how items broken before 1.3.0 are converted.
 - `Qualities.shift(stack, id, steps)` moves up or down to the next tier the item can take. `Qualities.isHighestLevel(stack, id)` tells you there is nothing above for that item.
 - `Qualities.idsByLevel()` lists all loaded tiers in ascending level order if you need to iterate.
 
