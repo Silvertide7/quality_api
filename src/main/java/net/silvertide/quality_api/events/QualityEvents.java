@@ -117,8 +117,7 @@ public final class QualityEvents {
             return;
         }
         for (Object2IntMap.Entry<ResourceKey<Enchantment>> entry : resolved.enchantmentLevels().object2IntEntrySet()) {
-            Holder<Enchantment> holder = event.getHolder(entry.getKey()).orElse(null);
-            if (holder != null) enchantments.set(holder, enchantments.getLevel(holder) + entry.getIntValue());
+            event.getHolder(entry.getKey()).ifPresent(holder -> enchantments.set(holder, enchantments.getLevel(holder) + entry.getIntValue()));
         }
     }
 
