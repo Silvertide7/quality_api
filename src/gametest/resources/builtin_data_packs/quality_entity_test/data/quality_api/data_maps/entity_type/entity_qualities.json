@@ -1,0 +1,57 @@
+{
+  "values": {
+    "minecraft:player": {
+      "quality_api:crude": {
+        "attributes": [
+          { "type": "minecraft:generic.max_health", "operation": "add_value", "amount": -6.0 }
+        ]
+      },
+      "quality_api:superior": {
+        "attributes": [
+          { "type": "minecraft:generic.max_health", "operation": "add_value", "amount": 10.0 },
+          { "type": "minecraft:generic.movement_speed", "operation": "add_multiplied_base", "amount": 0.2 }
+        ]
+      },
+      "quality_api:masterwork": {
+        "attributes": [
+          { "type": "minecraft:generic.max_health", "operation": "add_value", "amount": 30.0 },
+          { "type": "minecraft:generic.movement_speed", "operation": "add_multiplied_base", "amount": 0.3 },
+          { "type": "minecraft:generic.attack_damage", "operation": "add_value", "amount": 4.0 },
+          { "type": "minecraft:generic.scale", "operation": "add_value", "amount": 0.25 },
+          { "type": "minecraft:player.block_interaction_range", "operation": "add_value", "amount": 2.0 }
+        ]
+      }
+    },
+    "minecraft:cow": {
+      "quality_api:superior": {
+        "attributes": [
+          { "type": "minecraft:generic.max_health", "operation": "add_value", "amount": 10.0 },
+          { "type": "minecraft:generic.scale", "operation": "add_value", "amount": 0.25 }
+        ]
+      },
+      "quality_api:masterwork": {
+        "attributes": [
+          { "type": "minecraft:generic.max_health", "operation": "add_value", "amount": 20.0 },
+          { "type": "minecraft:generic.scale", "operation": "add_value", "amount": 0.5 },
+          { "type": "minecraft:generic.movement_speed", "operation": "add_multiplied_base", "amount": 0.5 }
+        ]
+      }
+    },
+    "minecraft:zombie": {
+      "quality_api:masterwork": {
+        "attributes": [
+          { "type": "minecraft:generic.max_health", "operation": "add_value", "amount": 30.0 },
+          { "type": "minecraft:generic.attack_damage", "operation": "add_value", "amount": 6.0 },
+          { "type": "minecraft:generic.scale", "operation": "add_value", "amount": 0.5 }
+        ]
+      }
+    },
+    "minecraft:drowned": {
+      "quality_api:masterwork": {
+        "attributes": [
+          { "type": "minecraft:generic.scale", "operation": "add_value", "amount": -0.3 }
+        ]
+      }
+    }
+  }
+}

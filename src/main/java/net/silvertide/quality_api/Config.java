@@ -43,6 +43,10 @@ public final class Config {
             .comment("Whether items of the highest quality tier can lose their tier when broken.")
             .define("highestTierCanDowngrade", true);
 
+    public static final ModConfigSpec.BooleanValue KEEP_PLAYER_QUALITY_ON_DEATH = COMMON
+            .comment("Players keep their entity quality when they die and respawn. Off clears it on death. Mob conversions keep quality either way.")
+            .define("keepPlayerQualityOnDeath", true);
+
     public static final ModConfigSpec COMMON_SPEC = COMMON.build();
 
     private static final ModConfigSpec.Builder CLIENT = new ModConfigSpec.Builder();

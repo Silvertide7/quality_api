@@ -2,12 +2,16 @@ package net.silvertide.quality_api.api;
 
 import net.minecraft.Util;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.ItemStack;
 import net.silvertide.quality_api.QualityAPI;
+import net.silvertide.quality_api.quality.EntityQualityModifiers;
 import net.silvertide.quality_api.quality.Quality;
 import net.silvertide.quality_api.quality.Snapshot;
 import net.silvertide.silverlib.feature.breakage.BrokenItems;
@@ -29,12 +33,24 @@ public final class Qualities {
         return id == null ? Optional.empty() : Optional.ofNullable(Snapshot.current().tiers().get(id));
     }
 
+    public static Optional<ResourceLocation> getId(Entity entity) {
+        return entity.getExistingData(QualityAPI.ENTITY_QUALITY).filter(Snapshot.current().tiers()::containsKey);
+    }
+
+    public static Optional<Quality> get(Entity entity) {
+        return entity.getExistingData(QualityAPI.ENTITY_QUALITY).map(Snapshot.current().tiers()::get);
+    }
+
     public static Optional<Quality> get(ResourceLocation id) {
         return Optional.ofNullable(Snapshot.current().tiers().get(id));
     }
 
     public static int level(ItemStack stack) {
         return get(stack).map(Quality::level).orElse(0);
+    }
+
+    public static int level(Entity entity) {
+        return get(entity).map(Quality::level).orElse(0);
     }
 
     public static int levelOf(ResourceLocation id) {
@@ -60,6 +76,18 @@ public final class Qualities {
         rescaleDamage(stack, previousMax);
     }
 
+    public static boolean apply(Entity entity, ResourceLocation id) {
+        if (get(id).isEmpty()) return false;
+        entity.setData(QualityAPI.ENTITY_QUALITY, id);
+        EntityQualityModifiers.refresh(entity);
+        return true;
+    }
+
+    public static void remove(Entity entity) {
+        entity.removeData(QualityAPI.ENTITY_QUALITY);
+        EntityQualityModifiers.refresh(entity);
+    }
+
     private static void rescaleDamage(ItemStack stack, int previousMax) {
         int newMax = stack.getMaxDamage();
         int damage = stack.getOrDefault(DataComponents.DAMAGE, 0);
@@ -71,6 +99,14 @@ public final class Qualities {
 
     public static boolean isBroken(ItemStack stack) {
         return getId(stack).isPresent() && BrokenItems.isBroken(stack);
+    }
+
+    public static FoodProperties applyFoodEffects(ItemStack food, FoodProperties original) {
+        ResourceLocation tier = food.get(QualityAPI.QUALITY.get());
+        if (tier == null) return original;
+        Snapshot.Resolved resolved = Snapshot.current().resolved(food.getItem(), tier);
+        if (resolved == null || !resolved.changesFood(original) || isBroken(food)) return original;
+        return resolved.applyTo(original);
     }
 
     public static boolean isHighestLevel(ItemStack stack, ResourceLocation id) {
@@ -103,9 +139,26 @@ public final class Qualities {
         return Optional.ofNullable(best);
     }
 
+    public static Optional<ResourceLocation> forLevel(int level) {
+        Snapshot snapshot = Snapshot.current();
+        for (ResourceLocation id : snapshot.idsByLevel()) {
+            Quality quality = snapshot.tiers().get(id);
+            if (quality.level() == level && quality.items().isEmpty()) return Optional.of(id);
+        }
+        return Optional.empty();
+    }
+
     public static Optional<ResourceLocation> forLevel(ItemStack stack, double level, RandomSource random) {
+        return forLevel(stack, rollFraction(level, random));
+    }
+
+    public static Optional<ResourceLocation> forLevel(double level, RandomSource random) {
+        return forLevel(rollFraction(level, random));
+    }
+
+    private static int rollFraction(double level, RandomSource random) {
         int lower = (int) Math.floor(level);
-        return forLevel(stack, random.nextDouble() < level - lower ? lower + 1 : lower);
+        return random.nextDouble() < level - lower ? lower + 1 : lower;
     }
 
     public static OptionalDouble meanLevel(Iterable<ItemStack> stacks) {
@@ -136,7 +189,32 @@ public final class Qualities {
     }
 
     public static Component displayName(ResourceLocation id) {
-        MutableComponent name = Component.translatable(Util.makeDescriptionId("quality", id));
+        return styled(id, Component.translatable(Util.makeDescriptionId("quality", id)));
+    }
+
+    public static Component displayName(ResourceLocation id, String nameSet) {
+        String defaultKey = Util.makeDescriptionId("quality", id);
+        String nameSetKey = defaultKey + "." + nameSet;
+        return styled(id, Component.translatable(Language.getInstance().has(nameSetKey) ? nameSetKey : defaultKey));
+    }
+
+    public static Component displayName(ItemStack stack, ResourceLocation id) {
+        return nameSet(stack).map(nameSet -> displayName(id, nameSet)).orElseGet(() -> displayName(id));
+    }
+
+    public static Component displayName(Entity entity, ResourceLocation id) {
+        return nameSet(entity).map(nameSet -> displayName(id, nameSet)).orElseGet(() -> displayName(id));
+    }
+
+    public static Optional<String> nameSet(ItemStack stack) {
+        return Optional.ofNullable(Snapshot.current().nameSets().get(stack.getItem()));
+    }
+
+    public static Optional<String> nameSet(Entity entity) {
+        return Optional.ofNullable(Snapshot.current().entityNameSets().get(entity.getType()));
+    }
+
+    private static Component styled(ResourceLocation id, MutableComponent name) {
         return get(id).map(quality -> name.withStyle(style -> style.withColor(quality.color()))).orElse(name);
     }
 

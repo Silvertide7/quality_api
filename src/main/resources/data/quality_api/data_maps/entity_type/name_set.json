@@ -1,0 +1,8 @@
+{
+  "values": {
+    "#quality_api:animals": { "name_set": "animal" },
+    "#quality_api:monsters": { "name_set": "monster" },
+    "#quality_api:townsfolk": { "name_set": "townsfolk" },
+    "minecraft:player": { "name_set": "player" }
+  }
+}

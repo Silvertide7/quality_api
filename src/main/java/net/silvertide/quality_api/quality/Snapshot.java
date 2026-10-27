@@ -1,5 +1,7 @@
 package net.silvertide.quality_api.quality;
 
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Multimap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMaps;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
@@ -9,14 +11,19 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.enchantment.Enchantment;
+import net.neoforged.neoforge.registries.datamaps.DataMapType;
 import net.silvertide.quality_api.QualityAPI;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,9 +36,12 @@ public record Snapshot(
         Map<ResourceLocation, Quality> tiers,
         List<ResourceLocation> idsByLevel,
         Map<ResourceLocation, Resolved> base,
-        Map<Item, Map<ResourceLocation, Resolved>> overrides) {
+        Map<Item, Map<ResourceLocation, Resolved>> overrides,
+        Map<Item, String> nameSets,
+        Map<EntityType<?>, String> entityNameSets,
+        Map<EntityType<?>, Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>>> entityModifiers) {
 
-    public static final Snapshot EMPTY = new Snapshot(Map.of(), List.of(), Map.of(), Map.of());
+    public static final Snapshot EMPTY = new Snapshot(Map.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
 
     private static volatile Snapshot current = EMPTY;
 
@@ -57,10 +67,16 @@ public record Snapshot(
         Map<ResourceLocation, Resolved> base = new HashMap<>();
         tiers.forEach((id, quality) -> base.put(id, Resolved.of(id, quality.effects())));
 
-        Map<Item, Map<ResourceLocation, Resolved>> overrides = resolveItemOverrides(access.registryOrThrow(Registries.ITEM), tiers);
+        Registry<Item> items = access.registryOrThrow(Registries.ITEM);
+        Map<Item, Map<ResourceLocation, Resolved>> overrides = resolveItemOverrides(items, tiers);
 
-        current = new Snapshot(Map.copyOf(tiers), idsByLevel, Map.copyOf(base), overrides);
+        Registry<EntityType<?>> entityTypes = access.registryOrThrow(Registries.ENTITY_TYPE);
+        current = new Snapshot(Map.copyOf(tiers), idsByLevel, Map.copyOf(base), overrides,
+                resolveNameSets(items, QualityAPI.NAME_SET),
+                resolveNameSets(entityTypes, QualityAPI.ENTITY_NAME_SET),
+                resolveEntityModifiers(entityTypes, tiers));
         QualityAPI.LOGGER.info("Loaded {} qualities and {} item overrides", tiers.size(), overrides.size());
+        if (!current.entityModifiers().isEmpty()) QualityAPI.LOGGER.info("Loaded entity attribute overrides for {} entity types", current.entityModifiers().size());
     }
 
     private static Map<Item, Map<ResourceLocation, Resolved>> resolveItemOverrides(Registry<Item> items, Map<ResourceLocation, Quality> tiers) {
@@ -84,6 +100,54 @@ public record Snapshot(
         return Map.copyOf(overrides);
     }
 
+    private static <T> Map<T, String> resolveNameSets(Registry<T> registry, DataMapType<T, String> nameSetMap) {
+        Map<T, String> nameSets = new HashMap<>();
+        registry.getDataMap(nameSetMap).forEach((key, nameSet) -> {
+            T element = registry.get(key);
+            if (element != null) nameSets.put(element, nameSet);
+        });
+        return Map.copyOf(nameSets);
+    }
+
+    private static Map<EntityType<?>, Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>>> resolveEntityModifiers(
+            Registry<EntityType<?>> entityTypes, Map<ResourceLocation, Quality> tiers) {
+        Map<EntityType<?>, Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>>> modifiers = new HashMap<>();
+        Set<ResourceLocation> unknownTiers = new HashSet<>();
+        entityTypes.getDataMap(QualityAPI.ENTITY_QUALITIES).forEach((typeKey, effectsByTier) -> {
+            EntityType<?> type = entityTypes.get(typeKey);
+            if (type == null) return;
+            Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>> modifiersByTier = new HashMap<>();
+            effectsByTier.forEach((tierId, effects) -> {
+                if (!tiers.containsKey(tierId)) {
+                    unknownTiers.add(tierId);
+                    return;
+                }
+                modifiersByTier.put(tierId, entityModifiersOf(tierId, effects));
+            });
+            modifiers.put(type, Map.copyOf(modifiersByTier));
+        });
+        unknownTiers.forEach(tierId -> QualityAPI.LOGGER.warn("Entity quality overrides reference unknown quality {}", tierId));
+        return Map.copyOf(modifiers);
+    }
+
+    public static Multimap<Holder<Attribute>, AttributeModifier> entityModifiersOf(ResourceLocation tier, EntityQualityEffects effects) {
+        List<EntityQualityEffects.EntityAttributeEffect> attributeEffects = effects.attributes().orElse(List.of());
+        ImmutableMultimap.Builder<Holder<Attribute>, AttributeModifier> modifiers = ImmutableMultimap.builder();
+        for (int i = 0; i < attributeEffects.size(); i++) {
+            EntityQualityEffects.EntityAttributeEffect effect = attributeEffects.get(i);
+            ResourceLocation id = QualityAPI.id("entity/" + tier.getNamespace() + "/" + tier.getPath() + "/" + i);
+            modifiers.put(effect.type(), new AttributeModifier(id, effect.amount(), effect.operation()));
+        }
+        return modifiers.build();
+    }
+
+    public Multimap<Holder<Attribute>, AttributeModifier> entityModifiers(EntityType<?> type, @Nullable ResourceLocation tier) {
+        if (tier == null) return ImmutableMultimap.of();
+        Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>> perType = entityModifiers.get(type);
+        Multimap<Holder<Attribute>, AttributeModifier> modifiers = perType == null ? null : perType.get(tier);
+        return modifiers == null ? ImmutableMultimap.of() : modifiers;
+    }
+
     @Nullable
     public Resolved resolved(Item item, ResourceLocation tier) {
         Map<ResourceLocation, Resolved> perItem = overrides.get(item);
@@ -97,13 +161,63 @@ public record Snapshot(
             float miningSpeedMultiplier,
             float durabilityMultiplier,
             Optional<Float> breakDowngradeChance,
-            float breakDestroyChance) {
+            float breakDestroyChance,
+            float nutritionMultiplier,
+            float saturationMultiplier,
+            float eatEffectDurationMultiplier,
+            List<FoodProperties.PossibleEffect> eatEffects) {
 
         public int scaleMaxDamage(int baseMaxDamage) {
             return durabilityMultiplier == 1.0F ? baseMaxDamage : Math.max(1, Math.round(baseMaxDamage * durabilityMultiplier));
         }
 
-        static Resolved of(ResourceLocation tier, QualityEffects effects) {
+        public boolean changesFood(FoodProperties food) {
+            return changesNutrition(food) || changesSaturation(food) || changesEffectDurations(food) || !eatEffects.isEmpty();
+        }
+
+        public boolean changesNutrition(FoodProperties food) {
+            return scaledNutrition(food) != food.nutrition();
+        }
+
+        public boolean changesSaturation(FoodProperties food) {
+            return saturationMultiplier != 1.0F && food.saturation() != 0.0F;
+        }
+
+        public boolean changesEffectDurations(FoodProperties food) {
+            return eatEffectDurationMultiplier != 1.0F && !food.effects().isEmpty();
+        }
+
+        private int scaledNutrition(FoodProperties food) {
+            return Math.round(food.nutrition() * nutritionMultiplier);
+        }
+
+        public FoodProperties applyTo(FoodProperties food) {
+            if (!changesFood(food)) return food;
+            List<FoodProperties.PossibleEffect> effects = new ArrayList<>(food.effects().size() + eatEffects.size());
+            for (FoodProperties.PossibleEffect existing : food.effects()) {
+                MobEffectInstance scaled = scaleDuration(existing.effect());
+                effects.add(new FoodProperties.PossibleEffect(() -> scaled, existing.probability()));
+            }
+            effects.addAll(eatEffects);
+            return new FoodProperties(
+                    scaledNutrition(food),
+                    food.saturation() * saturationMultiplier,
+                    food.canAlwaysEat(),
+                    food.eatSeconds(),
+                    food.usingConvertsTo(),
+                    List.copyOf(effects));
+        }
+
+        private MobEffectInstance scaleDuration(MobEffectInstance effect) {
+            if (eatEffectDurationMultiplier == 1.0F || effect.isInfiniteDuration()) return effect;
+            int duration = Math.max(1, Math.round(effect.getDuration() * eatEffectDurationMultiplier));
+            MobEffectInstance scaled = new MobEffectInstance(effect.getEffect(), duration, effect.getAmplifier(), effect.isAmbient(), effect.isVisible(), effect.showIcon());
+            scaled.getCures().clear();
+            scaled.getCures().addAll(effect.getCures());
+            return scaled;
+        }
+
+        public static Resolved of(ResourceLocation tier, QualityEffects effects) {
             List<QualityEffects.AttributeEffect> attributeEffects = effects.attributes().orElse(List.of());
             BakedAttribute[] attributes = new BakedAttribute[attributeEffects.size()];
             for (int i = 0; i < attributes.length; i++) {
@@ -116,7 +230,17 @@ public record Snapshot(
                     effects.miningSpeedMultiplier().orElse(1.0F),
                     effects.durabilityMultiplier().orElse(1.0F),
                     effects.breakDowngradeChance(),
-                    effects.breakDestroyChance().orElse(0.0F));
+                    effects.breakDestroyChance().orElse(0.0F),
+                    effects.nutritionMultiplier().orElse(1.0F),
+                    effects.saturationMultiplier().orElse(1.0F),
+                    effects.eatEffectDurationMultiplier().orElse(1.0F),
+                    effects.eatEffects().orElse(List.of()).stream().map(Resolved::possibleEffect).toList());
+        }
+
+        private static FoodProperties.PossibleEffect possibleEffect(QualityEffects.EatEffect eatEffect) {
+            return new FoodProperties.PossibleEffect(
+                    () -> new MobEffectInstance(eatEffect.effect(), eatEffect.duration(), eatEffect.amplifier()),
+                    eatEffect.probability());
         }
     }
 

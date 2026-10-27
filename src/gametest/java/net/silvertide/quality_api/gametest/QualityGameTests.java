@@ -1,6 +1,17 @@
 package net.silvertide.quality_api.gametest;
 
+import com.google.common.collect.Multimap;
 import com.mojang.authlib.GameProfile;
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.storage.loot.LootContext;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunctions;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 import com.mojang.datafixers.util.Either;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -9,22 +20,34 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.animal.Pig;
+import net.minecraft.world.entity.monster.ZombifiedPiglin;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -34,20 +57,27 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
+import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.registries.datamaps.AdvancedDataMapType;
 import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
 import net.silvertide.quality_api.api.QualityCraftEvent;
+import net.silvertide.quality_api.api.QualityFoodEatenEvent;
 import net.silvertide.quality_api.api.QualityItemBrokenEvent;
 import net.silvertide.quality_api.craft.MinQualityIngredient;
+import net.silvertide.quality_api.quality.EntityQualityEffects;
+import net.silvertide.quality_api.quality.EntityQualityModifiers;
 import net.silvertide.quality_api.quality.QualityEffects;
 import net.silvertide.quality_api.quality.Snapshot;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -116,8 +146,10 @@ public class QualityGameTests {
     public static void specificEntryPatchesGlobal(GameTestHelper helper) {
         Registry<Item> items = helper.getLevel().registryAccess().registryOrThrow(Registries.ITEM);
         QualityEffects.AttributeEffect attack = new QualityEffects.AttributeEffect(Attributes.ATTACK_DAMAGE, AttributeModifier.Operation.ADD_VALUE, 1.0, Optional.empty());
-        QualityEffects tagPatch = new QualityEffects(Optional.of(List.of(attack)), Optional.of(1.5F), Optional.empty(), Optional.of(1.6F), Optional.empty(), Optional.empty());
-        QualityEffects itemPatch = new QualityEffects(Optional.empty(), Optional.of(2.0F), Optional.of(Map.of()), Optional.empty(), Optional.empty(), Optional.empty());
+        QualityEffects tagPatch = new QualityEffects(Optional.of(List.of(attack)), Optional.of(1.5F), Optional.empty(), Optional.of(1.6F), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+        QualityEffects itemPatch = new QualityEffects(Optional.empty(), Optional.of(2.0F), Optional.of(Map.of()), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         Map<ResourceLocation, QualityEffects> merged = QualityEffects.mergeOverrides(items,
                 Either.right(ResourceKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace("iron_sword"))), Map.of(MASTERWORK, itemPatch),
                 Either.left(TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace("swords"))), Map.of(MASTERWORK, tagPatch, FINE, tagPatch));
@@ -130,7 +162,8 @@ public class QualityGameTests {
                 Either.left(TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace("swords"))), Map.of(MASTERWORK, tagPatch, FINE, tagPatch),
                 Either.right(ResourceKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace("iron_sword"))), Map.of(MASTERWORK, itemPatch));
         helper.assertTrue(merged.equals(mergedTagFirst), "item entry should win regardless of which entry came first");
-        QualityEffects laterTagPatch = new QualityEffects(Optional.empty(), Optional.of(3.0F), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+        QualityEffects laterTagPatch = new QualityEffects(Optional.empty(), Optional.of(3.0F), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         Map<ResourceLocation, QualityEffects> mergedTags = QualityEffects.mergeOverrides(items,
                 Either.left(TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace("swords"))), Map.of(MASTERWORK, tagPatch),
                 Either.left(TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "tools"))), Map.of(MASTERWORK, laterTagPatch));
@@ -453,6 +486,369 @@ public class QualityGameTests {
         helper.assertTrue(SUPERIOR.equals(rolled) || EXQUISITE.equals(rolled), "fractional level should roll between neighbours, was " + rolled);
         helper.assertTrue(Qualities.idsByLevel().size() == 6, "expected six shipped tiers");
         helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void nameSetsPickWordsByItemAndFallBack(GameTestHelper helper) {
+        helper.assertTrue(Qualities.nameSet(new ItemStack(Items.IRON_SWORD)).isEmpty(), "a sword should have no name set");
+        helper.assertTrue(Qualities.nameSet(new ItemStack(Items.CARROT)).equals(Optional.of("food")), "a carrot should use the food name set");
+        helper.assertTrue(Qualities.nameSet(new ItemStack(Items.WHEAT)).equals(Optional.of("food")), "wheat should use the food name set");
+        helper.assertTrue(translationKey(Qualities.displayName(SUPERIOR)).equals("quality.quality_api.superior"), "default name should use the base key");
+        helper.assertTrue(translationKey(Qualities.displayName(SUPERIOR, "food")).equals("quality.quality_api.superior.food"), "food set should use its own key");
+        Component hardy = Qualities.displayName(SUPERIOR, "animal");
+        helper.assertTrue(translationKey(hardy).equals("quality.quality_api.superior.animal") && hardy.getString().equals("Hardy"), "animal set should read Hardy, was " + hardy.getString());
+        helper.assertTrue(hardy.getStyle().getColor() != null && hardy.getStyle().getColor().getValue() == 0xFCEE4B, "name set should keep the tier colour");
+        AdvancedDataMapType<Item, String, ?> nameSetType = (AdvancedDataMapType<Item, String, ?>) QualityAPI.NAME_SET;
+        Registry<Item> items = helper.getLevel().registryAccess().registryOrThrow(Registries.ITEM);
+        Either<TagKey<Item>, ResourceKey<Item>> carrotEntry = Either.right(ResourceKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace("carrot")));
+        Either<TagKey<Item>, ResourceKey<Item>> cropsEntry = Either.left(TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "crops")));
+        helper.assertTrue(nameSetType.merger().merge(items, carrotEntry, "veg", cropsEntry, "food").equals("veg"), "an item entry should beat a later tag entry");
+        helper.assertTrue(nameSetType.merger().merge(items, cropsEntry, "food", carrotEntry, "veg").equals("veg"), "an item entry should beat an earlier tag entry");
+        Component unknownSet = Qualities.displayName(SUPERIOR, "foo");
+        helper.assertTrue(translationKey(unknownSet).equals("quality.quality_api.superior") && unknownSet.getString().equals("Superior"), "unknown set should fall back to the default name");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void forLevelWithoutStackSkipsFilteredTiers(GameTestHelper helper) {
+        helper.assertTrue(Qualities.forLevel(2).equals(Optional.of(SUPERIOR)), "level 2 should be superior");
+        helper.assertTrue(Qualities.forLevel(-1).equals(Optional.of(CRUDE)), "level -1 should be crude");
+        helper.assertTrue(Qualities.forLevel(99).isEmpty(), "level 99 should match nothing");
+        helper.assertTrue(Qualities.forLevel(2.0, RandomSource.create()).equals(Optional.of(SUPERIOR)), "a whole level should not roll up");
+        helper.assertTrue(Qualities.forLevel(1.9999999, RandomSource.create(1)).equals(Optional.of(SUPERIOR)), "a fraction near 1 should roll up");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void entityQualityPersistsAndUsesEntityNameSets(GameTestHelper helper) {
+        Cow cow = EntityType.COW.create(helper.getLevel());
+        helper.assertTrue(Qualities.getId(cow).isEmpty() && Qualities.level(cow) == 0, "a new cow should have no quality");
+        helper.assertFalse(Qualities.apply(cow, ResourceLocation.fromNamespaceAndPath("quality_api", "missing")), "an unknown tier should not apply to an entity");
+        helper.assertTrue(Qualities.apply(cow, SUPERIOR), "superior should apply to a cow");
+        helper.assertTrue(Qualities.getId(cow).equals(Optional.of(SUPERIOR)) && Qualities.level(cow) == 2, "the cow should be superior");
+        Cow reloaded = EntityType.COW.create(helper.getLevel());
+        reloaded.load(cow.saveWithoutId(new CompoundTag()));
+        helper.assertTrue(Qualities.getId(reloaded).equals(Optional.of(SUPERIOR)), "entity quality should survive save and load");
+        Component cowName = Qualities.displayName(cow, SUPERIOR);
+        helper.assertTrue(cowName.getString().equals("Hardy"), "a cow should use the animal name set, was " + cowName.getString());
+        helper.assertTrue(Qualities.nameSet(EntityType.TRADER_LLAMA.create(helper.getLevel())).equals(Optional.of("animal")), "a trader llama should use the animal name set through the animals tag");
+        Component zombieName = Qualities.displayName(EntityType.ZOMBIE.create(helper.getLevel()), SUPERIOR);
+        helper.assertTrue(zombieName.getString().equals("Fierce"), "a zombie should use the monster name set, was " + zombieName.getString());
+        Component playerName = Qualities.displayName(FakePlayerFactory.get(helper.getLevel(), new GameProfile(UUID.randomUUID(), "name-set-test")), SUPERIOR);
+        helper.assertTrue(playerName.getString().equals("Stalwart"), "a player should use the player name set, was " + playerName.getString());
+        Component golemName = Qualities.displayName(EntityType.IRON_GOLEM.create(helper.getLevel()), SUPERIOR);
+        helper.assertTrue(golemName.getString().equals("Skilled"), "an iron golem should use the townsfolk name set, was " + golemName.getString());
+        Component armorStandName = Qualities.displayName(EntityType.ARMOR_STAND.create(helper.getLevel()), SUPERIOR);
+        helper.assertTrue(armorStandName.getString().equals("Superior"), "an entity without a name set should use the default name, was " + armorStandName.getString());
+        Qualities.remove(cow);
+        helper.assertTrue(Qualities.getId(cow).isEmpty(), "removing should clear the cow's quality");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void copyEntityQualityFunctionFollowsTheEntity(GameTestHelper helper) {
+        Cow cow = EntityType.COW.create(helper.getLevel());
+        LootItemFunction copy = lootFunction(helper, "{\"function\": \"quality_api:copy_entity_quality\"}");
+        LootItemFunction copyOneLower = lootFunction(helper, "{\"function\": \"quality_api:copy_entity_quality\", \"level_offset\": -1}");
+        helper.assertTrue(copy.apply(new ItemStack(Items.BEEF), lootContext(helper, cow)).get(QualityAPI.QUALITY.get()) == null, "a cow without quality should drop plain beef");
+        Qualities.apply(cow, SUPERIOR);
+        helper.assertTrue(SUPERIOR.equals(copy.apply(new ItemStack(Items.BEEF), lootContext(helper, cow)).get(QualityAPI.QUALITY.get())), "a superior cow should drop superior beef");
+        helper.assertTrue(FINE.equals(copyOneLower.apply(new ItemStack(Items.BEEF), lootContext(helper, cow)).get(QualityAPI.QUALITY.get())), "an offset of -1 should drop fine beef");
+        helper.assertTrue(MASTERWORK.equals(copy.apply(withQuality(Items.BEEF, MASTERWORK), lootContext(helper, cow)).get(QualityAPI.QUALITY.get())), "an item that already has quality should keep it");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void entityMinQualityConditionComparesLevels(GameTestHelper helper) {
+        Cow cow = EntityType.COW.create(helper.getLevel());
+        LootItemCondition atLeastSuperior = lootCondition(helper, "{\"condition\": \"quality_api:entity_min_quality\", \"min_level\": 2}");
+        LootItemCondition atLeastStandard = lootCondition(helper, "{\"condition\": \"quality_api:entity_min_quality\", \"min_level\": 0}");
+        helper.assertTrue(atLeastStandard.test(lootContext(helper, cow)), "an entity without quality should count as level 0");
+        helper.assertFalse(atLeastSuperior.test(lootContext(helper, cow)), "an entity without quality should not pass min_level 2");
+        Qualities.apply(cow, FINE);
+        helper.assertFalse(atLeastSuperior.test(lootContext(helper, cow)), "a fine cow should not pass min_level 2");
+        Qualities.apply(cow, SUPERIOR);
+        helper.assertTrue(atLeastSuperior.test(lootContext(helper, cow)), "a superior cow should pass min_level 2");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void entityWithRemovedTierHasNoQualityAndCanBeCleared(GameTestHelper helper) {
+        Cow cow = helper.spawn(EntityType.COW, new BlockPos(1, 2, 1));
+        try {
+            cow.setData(QualityAPI.ENTITY_QUALITY, QualityAPI.id("removed_tier"));
+            helper.assertTrue(Qualities.getId(cow).isEmpty() && Qualities.level(cow) == 0, "a removed tier should read as no quality");
+            runCommand(helper, "quality entity " + cow.getStringUUID() + " remove");
+            helper.assertFalse(cow.hasData(QualityAPI.ENTITY_QUALITY), "the command should clear a removed tier id");
+        } finally {
+            cow.discard();
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void entityQualitiesJsonDecodesAndTypeEntriesBeatTags(GameTestHelper helper) {
+        Map<ResourceLocation, EntityQualityEffects> tagEntry = EntityQualityEffects.OVERRIDES_CODEC.parse(
+                helper.getLevel().registryAccess().createSerializationContext(JsonOps.INSTANCE),
+                JsonParser.parseString("{\"quality_api:superior\": {\"attributes\": [{\"type\": \"minecraft:generic.max_health\", \"operation\": \"add_value\", \"amount\": 4.0}]}}")).getOrThrow();
+        Map<ResourceLocation, EntityQualityEffects> typeEntry = Map.of(SUPERIOR, new EntityQualityEffects(Optional.of(List.of())));
+        Map<ResourceLocation, EntityQualityEffects> emptyPatch = Map.of(SUPERIOR, new EntityQualityEffects(Optional.empty()));
+        Either<TagKey<EntityType<?>>, ResourceKey<EntityType<?>>> animals = Either.left(TagKey.create(Registries.ENTITY_TYPE, QualityAPI.id("animals")));
+        Either<TagKey<EntityType<?>>, ResourceKey<EntityType<?>>> cowKey = Either.right(ResourceKey.create(Registries.ENTITY_TYPE, ResourceLocation.withDefaultNamespace("cow")));
+        Registry<EntityType<?>> entityTypes = helper.getLevel().registryAccess().registryOrThrow(Registries.ENTITY_TYPE);
+        helper.assertTrue(tagEntry.get(SUPERIOR).attributes().orElseThrow().getFirst().amount() == 4.0, "the attribute amount should decode");
+        helper.assertTrue(EntityQualityEffects.mergeOverrides(entityTypes, cowKey, typeEntry, animals, tagEntry).get(SUPERIOR).attributes().orElseThrow().isEmpty(), "a type entry should beat a later tag entry");
+        helper.assertTrue(EntityQualityEffects.mergeOverrides(entityTypes, animals, tagEntry, cowKey, typeEntry).get(SUPERIOR).attributes().orElseThrow().isEmpty(), "a type entry should beat an earlier tag entry");
+        helper.assertTrue(EntityQualityEffects.mergeOverrides(entityTypes, animals, tagEntry, cowKey, emptyPatch).get(SUPERIOR).attributes().orElseThrow().size() == 1, "a type entry that names no field should keep the tag's attributes");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void entityCommandSetsAndRemovesQuality(GameTestHelper helper) {
+        Cow cow = helper.spawn(EntityType.COW, new BlockPos(1, 2, 1));
+        try {
+            runCommand(helper, "quality entity " + cow.getStringUUID() + " set quality_api:superior");
+            helper.assertTrue(Qualities.getId(cow).equals(Optional.of(SUPERIOR)), "the command should make the cow superior");
+            runCommand(helper, "quality entity " + cow.getStringUUID() + " remove");
+            helper.assertTrue(Qualities.getId(cow).isEmpty(), "the command should remove the cow's quality");
+        } finally {
+            cow.discard();
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void entityQualityAttributesApplyAndKeepHealthPercentage(GameTestHelper helper) {
+        Snapshot loaded = Snapshot.current();
+        installSnapshot(withEntityAttributes(loaded, EntityType.COW, SUPERIOR, List.of(
+                new EntityQualityEffects.EntityAttributeEffect(Attributes.MAX_HEALTH, AttributeModifier.Operation.ADD_VALUE, 10.0),
+                new EntityQualityEffects.EntityAttributeEffect(Attributes.MOVEMENT_SPEED, AttributeModifier.Operation.ADD_MULTIPLIED_BASE, 0.5))));
+        try {
+            Cow cow = EntityType.COW.create(helper.getLevel());
+            double baseSpeed = cow.getAttributeValue(Attributes.MOVEMENT_SPEED);
+            cow.setHealth(5.0F);
+            Qualities.apply(cow, SUPERIOR);
+            helper.assertTrue(cow.getMaxHealth() == 20.0F && cow.getHealth() == 10.0F, "a superior cow should have 10/20 health, had " + cow.getHealth() + "/" + cow.getMaxHealth());
+            helper.assertTrue(Math.abs(cow.getAttributeValue(Attributes.MOVEMENT_SPEED) - baseSpeed * 1.5) < 1.0E-6, "a superior cow should be 50% faster");
+            Qualities.apply(cow, FINE);
+            helper.assertTrue(cow.getMaxHealth() == 10.0F && cow.getHealth() == 5.0F, "a tier without entity attributes should restore 5/10 health, had " + cow.getHealth() + "/" + cow.getMaxHealth());
+            Qualities.apply(cow, SUPERIOR);
+            Qualities.remove(cow);
+            helper.assertTrue(cow.getMaxHealth() == 10.0F && Math.abs(cow.getAttributeValue(Attributes.MOVEMENT_SPEED) - baseSpeed) < 1.0E-6, "removing quality should remove its modifiers");
+            Qualities.apply(cow, SUPERIOR);
+            cow.setHealth(18.0F);
+            Cow reloaded = EntityType.COW.create(helper.getLevel());
+            reloaded.load(cow.saveWithoutId(new CompoundTag()));
+            helper.assertTrue(reloaded.getMaxHealth() == 20.0F && reloaded.getHealth() == 18.0F, "a loaded cow should keep its saved 18/20 health, had " + reloaded.getHealth() + "/" + reloaded.getMaxHealth());
+        } finally {
+            installSnapshot(loaded);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void conversionKeepsQualityAndUsesTheNewTypesAttributes(GameTestHelper helper) {
+        Snapshot loaded = Snapshot.current();
+        Snapshot pigOnly = withEntityAttributes(loaded, EntityType.PIG, SUPERIOR, List.of(
+                new EntityQualityEffects.EntityAttributeEffect(Attributes.MOVEMENT_SPEED, AttributeModifier.Operation.ADD_MULTIPLIED_BASE, 0.5)));
+        installSnapshot(withEntityAttributes(pigOnly, EntityType.ZOMBIFIED_PIGLIN, SUPERIOR, List.of(
+                new EntityQualityEffects.EntityAttributeEffect(Attributes.MAX_HEALTH, AttributeModifier.Operation.ADD_VALUE, 10.0))));
+        Pig pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        ZombifiedPiglin piglin = null;
+        try {
+            Qualities.apply(pig, SUPERIOR);
+            piglin = pig.convertTo(EntityType.ZOMBIFIED_PIGLIN, false);
+            helper.assertTrue(piglin != null, "the pig should convert");
+            EventHooks.onLivingConvert(pig, piglin);
+            double basePiglinSpeed = piglin.getAttributeBaseValue(Attributes.MOVEMENT_SPEED);
+            helper.assertTrue(Qualities.getId(piglin).equals(Optional.of(SUPERIOR)), "the zombified piglin should keep the pig's quality");
+            helper.assertTrue(piglin.getMaxHealth() == 30.0F && piglin.getHealth() == 30.0F, "the zombified piglin should use its own attributes, had " + piglin.getHealth() + "/" + piglin.getMaxHealth());
+            helper.assertTrue(piglin.getAttributeValue(Attributes.MOVEMENT_SPEED) == basePiglinSpeed, "the pig's speed bonus should not carry over");
+        } finally {
+            installSnapshot(loaded);
+            if (piglin != null) piglin.discard();
+            pig.discard();
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void playerQualitySurvivesDeathAndLeavingTheEnd(GameTestHelper helper) {
+        Snapshot loaded = Snapshot.current();
+        installSnapshot(withEntityAttributes(loaded, EntityType.PLAYER, SUPERIOR, List.of(
+                new EntityQualityEffects.EntityAttributeEffect(Attributes.MAX_HEALTH, AttributeModifier.Operation.ADD_VALUE, 10.0))));
+        boolean configuredKeepOnDeath = Config.KEEP_PLAYER_QUALITY_ON_DEATH.get();
+        Config.KEEP_PLAYER_QUALITY_ON_DEATH.set(true);
+        try {
+            ServerPlayer original = FakePlayerFactory.get(helper.getLevel(), new GameProfile(UUID.randomUUID(), "original-test"));
+            Qualities.apply(original, SUPERIOR);
+            original.setHealth(25.0F);
+            ServerPlayer leftTheEnd = FakePlayerFactory.get(helper.getLevel(), new GameProfile(UUID.randomUUID(), "left-the-end-test"));
+            leftTheEnd.restoreFrom(original, true);
+            helper.assertTrue(leftTheEnd.getMaxHealth() == 30.0F && leftTheEnd.getHealth() == 25.0F, "leaving the End should keep 25/30 health, had " + leftTheEnd.getHealth() + "/" + leftTheEnd.getMaxHealth());
+            original.setHealth(0.0F);
+            ServerPlayer respawned = FakePlayerFactory.get(helper.getLevel(), new GameProfile(UUID.randomUUID(), "respawned-test"));
+            respawned.restoreFrom(original, false);
+            helper.assertTrue(Qualities.getId(respawned).equals(Optional.of(SUPERIOR)), "the quality should survive death");
+            helper.assertTrue(respawned.getMaxHealth() == 30.0F && respawned.getHealth() == 30.0F, "a respawned player should have full 30/30 health, had " + respawned.getHealth() + "/" + respawned.getMaxHealth());
+            Config.KEEP_PLAYER_QUALITY_ON_DEATH.set(false);
+            ServerPlayer clearedOnDeath = FakePlayerFactory.get(helper.getLevel(), new GameProfile(UUID.randomUUID(), "cleared-on-death-test"));
+            clearedOnDeath.restoreFrom(original, false);
+            helper.assertTrue(Qualities.getId(clearedOnDeath).isEmpty(), "with keepPlayerQualityOnDeath off the quality should be cleared on death");
+            helper.assertTrue(clearedOnDeath.getMaxHealth() == 20.0F && clearedOnDeath.getHealth() == 20.0F, "a player who lost quality should respawn at 20/20, had " + clearedOnDeath.getHealth() + "/" + clearedOnDeath.getMaxHealth());
+            ServerPlayer leftTheEndWithoutDying = FakePlayerFactory.get(helper.getLevel(), new GameProfile(UUID.randomUUID(), "kept-without-death-test"));
+            original.setHealth(25.0F);
+            leftTheEndWithoutDying.restoreFrom(original, true);
+            helper.assertTrue(Qualities.getId(leftTheEndWithoutDying).equals(Optional.of(SUPERIOR)), "leaving the End should keep quality even with keepPlayerQualityOnDeath off");
+        } finally {
+            Config.KEEP_PLAYER_QUALITY_ON_DEATH.set(configuredKeepOnDeath);
+            installSnapshot(loaded);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void reloadRefreshesLoadedEntityAttributes(GameTestHelper helper) {
+        Snapshot loaded = Snapshot.current();
+        Cow cow = helper.spawn(EntityType.COW, new BlockPos(1, 2, 1));
+        try {
+            installSnapshot(withEntityAttributes(loaded, EntityType.COW, SUPERIOR, List.of(
+                    new EntityQualityEffects.EntityAttributeEffect(Attributes.MAX_HEALTH, AttributeModifier.Operation.ADD_VALUE, 10.0))));
+            Qualities.apply(cow, SUPERIOR);
+            helper.assertTrue(cow.getMaxHealth() == 20.0F && cow.getHealth() == 20.0F, "a superior cow should have 20/20 health");
+            installSnapshot(withEntityAttributes(loaded, EntityType.COW, SUPERIOR, List.of(
+                    new EntityQualityEffects.EntityAttributeEffect(Attributes.MAX_HEALTH, AttributeModifier.Operation.ADD_VALUE, 30.0))));
+            EntityQualityModifiers.refreshLoadedEntities(helper.getLevel().getServer());
+            helper.assertTrue(cow.getMaxHealth() == 40.0F && cow.getHealth() == 40.0F, "a reload should give the cow 40/40 health, had " + cow.getHealth() + "/" + cow.getMaxHealth());
+        } finally {
+            installSnapshot(loaded);
+            cow.discard();
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void qualityFoodRestoresScaledNutritionAndPostsEvent(GameTestHelper helper) {
+        QualityEffects patch = foodPatch(Optional.of(1.4F), Optional.of(0.5F), Optional.empty(), Optional.empty());
+        withFoodOverride(Items.COOKED_BEEF, MASTERWORK, patch, () -> {
+            ServerPlayer player = mockServerPlayer(helper);
+            player.getFoodData().setFoodLevel(0);
+            player.getFoodData().setSaturation(0.0F);
+            float halvedBeefSaturation = Items.COOKED_BEEF.components().get(DataComponents.FOOD).saturation() * 0.5F;
+            List<QualityFoodEatenEvent> eaten = new ArrayList<>();
+            Consumer<QualityFoodEatenEvent> recordEaten = event -> eaten.add(event);
+            NeoForge.EVENT_BUS.addListener(recordEaten);
+            try {
+                eat(helper, player, withQuality(Items.COOKED_BEEF, MASTERWORK));
+            } finally {
+                NeoForge.EVENT_BUS.unregister(recordEaten);
+            }
+            helper.assertTrue(player.getFoodData().getFoodLevel() == 11, "masterwork beef should restore 11 hunger, restored " + player.getFoodData().getFoodLevel());
+            helper.assertTrue(Math.abs(player.getFoodData().getSaturationLevel() - halvedBeefSaturation) < 0.001F, "masterwork beef should restore half saturation, restored " + player.getFoodData().getSaturationLevel());
+            helper.assertTrue(eaten.size() == 1 && MASTERWORK.equals(eaten.getFirst().getQuality())
+                    && eaten.getFirst().getOriginal().nutrition() == 8 && eaten.getFirst().getApplied().nutrition() == 11
+                    && eaten.getFirst().getFood().is(Items.COOKED_BEEF), "expected one QualityFoodEatenEvent with original and applied values");
+        });
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void qualityFoodAppliesExtraEatEffects(GameTestHelper helper) {
+        QualityEffects.EatEffect absorption = new QualityEffects.EatEffect(MobEffects.ABSORPTION, 1200, 1, 1.0F);
+        QualityEffects patch = foodPatch(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of(absorption)));
+        withFoodOverride(Items.COOKED_BEEF, MASTERWORK, patch, () -> {
+            ServerPlayer player = mockServerPlayer(helper);
+            eat(helper, player, withQuality(Items.COOKED_BEEF, MASTERWORK));
+            MobEffectInstance applied = player.getEffect(MobEffects.ABSORPTION);
+            helper.assertTrue(applied != null && applied.getAmplifier() == 1 && applied.getDuration() == 1200, "eating should apply Absorption II for 1200 ticks, got " + applied);
+        });
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void qualityFoodScalesExistingEffectDurations(GameTestHelper helper) {
+        QualityEffects patch = foodPatch(Optional.empty(), Optional.empty(), Optional.of(2.0F), Optional.empty());
+        withFoodOverride(Items.GOLDEN_APPLE, MASTERWORK, patch, () -> {
+            ServerPlayer player = mockServerPlayer(helper);
+            eat(helper, player, withQuality(Items.GOLDEN_APPLE, MASTERWORK));
+            MobEffectInstance regeneration = player.getEffect(MobEffects.REGENERATION);
+            helper.assertTrue(regeneration != null && regeneration.getDuration() == 200, "golden apple regeneration should last 200 ticks, got " + regeneration);
+        });
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void neutralQualityKeepsTheSameFoodProperties(GameTestHelper helper) {
+        ItemStack beef = withQuality(Items.COOKED_BEEF, MASTERWORK);
+        FoodProperties original = beef.get(DataComponents.FOOD);
+        helper.assertTrue(Qualities.applyFoodEffects(beef, original) == original, "a tier with neutral food values should return the same instance");
+        helper.assertTrue(Qualities.applyFoodEffects(new ItemStack(Items.COOKED_BEEF), original) == original, "plain food should return the same instance");
+        FoodProperties carrot = Items.CARROT.components().get(DataComponents.FOOD);
+        Snapshot.Resolved roundsAway = Snapshot.Resolved.of(MASTERWORK, foodPatch(Optional.of(1.1F), Optional.empty(), Optional.of(2.0F), Optional.empty()));
+        helper.assertTrue(!roundsAway.changesFood(carrot) && roundsAway.applyTo(carrot) == carrot, "a nutrition change that rounds away and a duration change on an effect-free food should change nothing");
+        helper.succeed();
+    }
+
+    private static QualityEffects foodPatch(Optional<Float> nutritionMultiplier, Optional<Float> saturationMultiplier, Optional<Float> eatEffectDurationMultiplier, Optional<List<QualityEffects.EatEffect>> eatEffects) {
+        return new QualityEffects(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                nutritionMultiplier, saturationMultiplier, eatEffectDurationMultiplier, eatEffects);
+    }
+
+    private static void withFoodOverride(Item item, ResourceLocation tier, QualityEffects patch, Runnable body) {
+        Snapshot loaded = Snapshot.current();
+        Map<Item, Map<ResourceLocation, Snapshot.Resolved>> overrides = new HashMap<>(loaded.overrides());
+        overrides.put(item, Map.of(tier, Snapshot.Resolved.of(tier, loaded.tiers().get(tier).effects().patchedWith(patch))));
+        installSnapshot(new Snapshot(loaded.tiers(), loaded.idsByLevel(), loaded.base(), Map.copyOf(overrides), loaded.nameSets(), loaded.entityNameSets(), loaded.entityModifiers()));
+        try {
+            body.run();
+        } finally {
+            installSnapshot(loaded);
+        }
+    }
+
+    private static Snapshot withEntityAttributes(Snapshot loaded, EntityType<?> type, ResourceLocation tier, List<EntityQualityEffects.EntityAttributeEffect> attributes) {
+        Map<EntityType<?>, Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>>> entityModifiers = new HashMap<>(loaded.entityModifiers());
+        entityModifiers.put(type, Map.of(tier, Snapshot.entityModifiersOf(tier, new EntityQualityEffects(Optional.of(attributes)))));
+        return new Snapshot(loaded.tiers(), loaded.idsByLevel(), loaded.base(), loaded.overrides(), loaded.nameSets(), loaded.entityNameSets(), Map.copyOf(entityModifiers));
+    }
+
+    private static void runCommand(GameTestHelper helper, String command) {
+        MinecraftServer server = helper.getLevel().getServer();
+        server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), command);
+    }
+
+    private static LootItemFunction lootFunction(GameTestHelper helper, String json) {
+        return LootItemFunctions.ROOT_CODEC.parse(helper.getLevel().registryAccess().createSerializationContext(JsonOps.INSTANCE), JsonParser.parseString(json)).getOrThrow();
+    }
+
+    private static LootItemCondition lootCondition(GameTestHelper helper, String json) {
+        return LootItemCondition.DIRECT_CODEC.parse(helper.getLevel().registryAccess().createSerializationContext(JsonOps.INSTANCE), JsonParser.parseString(json)).getOrThrow();
+    }
+
+    private static LootContext lootContext(GameTestHelper helper, Entity entity) {
+        LootParams params = new LootParams.Builder(helper.getLevel())
+                .withParameter(LootContextParams.THIS_ENTITY, entity)
+                .withParameter(LootContextParams.ORIGIN, entity.position())
+                .create(LootContextParamSets.ADVANCEMENT_ENTITY);
+        return new LootContext.Builder(params).create(Optional.empty());
+    }
+
+    private static void installSnapshot(Snapshot snapshot) {
+        try {
+            Field current = Snapshot.class.getDeclaredField("current");
+            current.setAccessible(true);
+            current.set(null, snapshot);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void eat(GameTestHelper helper, ServerPlayer player, ItemStack food) {
+        player.eat(helper.getLevel(), food, food.getFoodProperties(player));
+    }
+
+    private static String translationKey(Component component) {
+        return component.getContents() instanceof TranslatableContents contents ? contents.getKey() : "";
     }
 
     private static ItemStack breakFresh(GameTestHelper helper, ResourceLocation tier) {

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:entity",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:rotten_flesh",
+          "functions": [
+            { "function": "minecraft:set_count", "count": { "min": 0, "max": 2 } },
+            { "function": "quality_api:copy_entity_quality", "level_offset": -0.5 }
+          ]
+        }
+      ]
+    }
+  ]
+}

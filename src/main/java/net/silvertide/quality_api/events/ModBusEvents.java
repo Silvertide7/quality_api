@@ -19,5 +19,8 @@ public final class ModBusEvents {
     @SubscribeEvent
     static void registerDataMaps(RegisterDataMapTypesEvent event) {
         event.register(QualityAPI.ITEM_QUALITIES);
+        event.register(QualityAPI.NAME_SET);
+        event.register(QualityAPI.ENTITY_NAME_SET);
+        event.register(QualityAPI.ENTITY_QUALITIES);
     }
 }

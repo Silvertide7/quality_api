@@ -1,0 +1,7 @@
+{
+  "values": {
+    "#c:foods": { "name_set": "food" },
+    "#c:crops": { "name_set": "food" },
+    "#minecraft:fishes": { "name_set": "food" }
+  }
+}

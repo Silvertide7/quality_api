@@ -104,6 +104,11 @@ if (chosen != null && Qualities.apply(result, chosen)) {
 - `Qualities.isBroken(stack)` tells you the item has a quality and SilverLib is keeping it broken (its broken marker is set and it is at zero durability), so it is unusable until repaired. Setting damage to max by hand does not make an item broken straight away. Quality API treats an unmarked quality item whose damage is exactly its max (with a tier that is still loaded) as broken before 1.3.0 and converts it, keeping it broken without a destroy or downgrade roll and without posting `QualityItemBrokenEvent`. That happens when its holder logs in (player inventory, armour and offhand), when it is put into one of the six vanilla equipment slots of any living entity, or the next time it takes damage that gets through Unbreaking from a non-creative holder. Items only in containers or Curios slots wait until one of those happens. With `brokenInsteadOfDestroyed` off, nothing is converted and the next break destroys the item as usual. An item pushed past its max by a durability change (for example a datapack lowering `durability_multiplier`) is not converted; it breaks normally the next time it is damaged.
 - `Qualities.shift(stack, id, steps)` moves up or down to the next tier the item can take. `Qualities.isHighestLevel(stack, id)` tells you there is nothing above for that item.
 - `Qualities.idsByLevel()` lists all loaded tiers in ascending level order if you need to iterate.
+- `Qualities.forLevel(int)` gives a tier id for a level without a stack: the first tier at that level with no `items` filter, or empty when none exists. Use it to label things that are not items, such as an animal or a plot of land.
+- `Qualities.forLevel(double, random)` does the same with the fraction rolled, like the stack version, for things like breeding from the parents' mean level. Unlike the stack version it has no nearest-tier fallback, so a level past the highest or lowest tier (a 4.5 average rolling 5) returns empty; clamp to the range you ship.
+- Entities carry quality too. `Qualities.apply(entity, id)` stores a tier id in the `quality_api:quality` attachment (any loaded tier; the `items` filter and blacklist are item rules and do not apply), and `getId(entity)`, `get(entity)`, `level(entity)` and `remove(entity)` mirror the stack versions. The attachment saves with the entity and syncs to clients tracking it. Read it through `Qualities` (or `getExistingData`), never `entity.getData`, which would store a `standard` quality on the entity. Change it only through `Qualities.apply` and `Qualities.remove`; setting the attachment yourself skips the attribute update. The quality survives a player's death (unless the `keepPlayerQualityOnDeath` config is off) and mob conversions (villager to zombie villager, pig to zombified piglin and so on); a converted mob gets the attributes of its new type's entry, or none if that type has no entry. Quality API copies nothing on breeding, spawn eggs or drops; deciding that is your mod's job, for example copying `Qualities.level(cow)` onto its beef with `forLevel(stack, level)`. Entity attributes come from the `entity_qualities` data map (section 7); applying or removing a quality updates them immediately, and a raised or lowered max health keeps the entity's health percentage.
+- `Qualities.displayName(id)` is the coloured tier name. `Qualities.displayName(id, nameSet)` reads the same tier through a name set, so a level-2 carrot is "Choice" and a level-2 animal "Hardy" while a sword stays "Superior". `Qualities.nameSet(stack)` is the item's set from the `quality_api:name_set` data map, if any. `Qualities.displayName(stack, id)` does both: the stack's set, else the default name. `Qualities.nameSet(entity)` and `Qualities.displayName(entity, id)` do the same for entities, from the entity type data map. An unknown set falls back to the default name. On a dedicated server the language is English, so send the component to the client rather than a resolved string.
+- `Qualities.applyFoodEffects(stack, food)` returns the `FoodProperties` a player gets from eating that stack, or the same instance when its tier is neutral for food. Use it to preview food values in your own UI.
 
 All of these return empty or 0 before the first world load. Never call them from a static initialiser, and never call `QualityAPI.QUALITY.get()` before registries exist.
 
@@ -129,6 +134,80 @@ All of these return empty or 0 before the first world load. Never call them from
 ```
 
 Item entries beat tag entries. Remove an inherited effect by setting its neutral value: an empty list, an empty map, or a multiplier of 1.0.
+
+**Food.** Four more fields work the same way, in a tier file or as a patch. `nutrition_multiplier` scales hunger restored (rounded), `saturation_multiplier` scales saturation, `eat_effect_duration_multiplier` scales every effect the food already gives, and `eat_effects` adds effects (`effect`, `duration` in ticks, `amplifier` default 0, `probability` default 1.0). The shipped tiers set none of them, so food is unchanged until a pack opts in. Only players get food effects, and food blocks such as cakes lose quality when placed. The tooltip lists the changes, and AppleSkin's hunger preview matches when it is installed.
+
+```json
+{
+  "values": {
+    "#c:foods": {
+      "quality_api:masterwork": { "nutrition_multiplier": 1.4, "saturation_multiplier": 1.75, "eat_effect_duration_multiplier": 1.5 }
+    },
+    "#c:foods/soup": {
+      "quality_api:masterwork": { "eat_effects": [ { "effect": "minecraft:absorption", "duration": 1200, "amplifier": 0 } ] }
+    }
+  }
+}
+```
+
+Listen to `QualityFoodEatenEvent` (server side, not cancellable) for custom outcomes when a quality food is eaten. It carries the `ServerPlayer`, a copy of the food taken before it was consumed, the tier id, and the original and applied `FoodProperties`.
+
+**Name sets.** Give your items different words for the same level with `data/quality_api/data_maps/item/name_set.json`, then add `quality.<ns>.<path>.<set>` lang keys for each tier:
+
+```json
+{
+  "values": {
+    "#yourmod:gems": { "name_set": "gem" }
+  }
+}
+```
+
+Entities use the same format in `data/quality_api/data_maps/entity_type/name_set.json`, keyed by entity type or entity type tag. Quality API ships `food` for `#c:foods`, `#c:crops` and `#minecraft:fishes` (items), `animal` for the entity type tag `#quality_api:animals` (every vanilla animal: livestock, mounts, pets, wildlife and fish), `monster` for `#quality_api:monsters` (every vanilla hostile mob and boss), `townsfolk` for `#quality_api:townsfolk` (villagers, the wandering trader, iron and snow golems, the allay), `player` for `minecraft:player`, and `food`, `animal`, `monster`, `townsfolk` and `player` names for its six tiers. Add modded mobs to `data/quality_api/tags/entity_type/animals.json`, `monsters.json` or `townsfolk.json` rather than to the data map; the same tags also work as keys in `entity_qualities`. Entities outside any set read the default tier names.
+
+**Entity attributes.** Give entities attributes per tier with `data/quality_api/data_maps/entity_type/entity_qualities.json`, keyed by entity type or entity type tag. Entries patch like `item_qualities`, with entity type entries beating tag entries, but tier files never apply to entities: an entity type with no entry gets no attributes. There is no `slot`.
+
+```json
+{
+  "values": {
+    "minecraft:cow": {
+      "quality_api:masterwork": {
+        "attributes": [
+          { "type": "minecraft:generic.max_health", "operation": "add_multiplied_base", "amount": 0.5 },
+          { "type": "minecraft:generic.movement_speed", "operation": "add_multiplied_base", "amount": 0.2 }
+        ]
+      }
+    }
+  }
+}
+```
+
+An attribute the entity type does not have (for example `attack_damage` on a cow) is skipped silently. The modifiers are not saved on the entity; they are recomputed on load and on `/reload`, so changing the file reaches existing entities. When max health changes, current health keeps the same percentage.
+
+**Drops that follow the entity.** Add `quality_api:copy_entity_quality` to an entity loot table entry and the dropped item takes the entity's level plus `level_offset` (optional, default 0, fractions rolled, so `-0.5` drops one tier lower half the time). The nearest tier the item can take is used, so blacklisted items and `items` filters are respected; an item that already has a quality keeps it, and an entity without quality drops plain items. The `quality_api:entity_min_quality` condition (`min_level`) passes when the entity's level is at least that, with no quality counting as 0 like the `min_quality` ingredient. Both read `this_entity`, which is the dropping mob only in entity loot tables (and in barter, gift and bogged shearing tables); in chest, block, archaeology and vault tables it is the player, so the drop would copy the player's quality, and in fishing tables it is the hook. Use them in entity loot tables. In 1.21.1 sheep wool from shearing, chicken eggs and milk are not loot tables, so those need code.
+
+```json
+{
+  "type": "minecraft:entity",
+  "pools": [ {
+    "rolls": 1,
+    "entries": [ {
+      "type": "minecraft:item",
+      "name": "minecraft:beef",
+      "functions": [
+        { "function": "minecraft:set_count", "count": { "min": 1, "max": 3 } },
+        { "function": "quality_api:copy_entity_quality", "level_offset": -0.5,
+          "conditions": [ { "condition": "quality_api:entity_min_quality", "min_level": 1 } ] }
+      ]
+    } ]
+  }, {
+    "rolls": 1,
+    "conditions": [ { "condition": "quality_api:entity_min_quality", "min_level": 3 } ],
+    "entries": [ { "type": "minecraft:item", "name": "minecraft:leather" } ]
+  } ]
+}
+```
+
+A tier at level 0 (`standard`) is still a component, so standard beef stacks separately from plain beef. An offset never makes the drop plain (the nearest tier is always used), so put the condition on the function, as above, to copy only from fine or better animals. Each pool rolls its entries independently, which is why the bonus leather has its own pool.
 
 **Non-damageable carriers.** Ingots, gems, and tool heads can hold quality without gaining durability. Nothing special is required. Quality on stackables only makes them stack separately from plain ones.
 

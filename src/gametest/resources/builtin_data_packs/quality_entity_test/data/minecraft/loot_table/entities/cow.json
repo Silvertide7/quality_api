@@ -1,0 +1,42 @@
+{
+  "type": "minecraft:entity",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:beef",
+          "functions": [
+            { "function": "minecraft:set_count", "count": { "min": 1, "max": 3 } },
+            {
+              "function": "quality_api:copy_entity_quality",
+              "conditions": [ { "condition": "quality_api:entity_min_quality", "min_level": 1 } ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:leather",
+          "functions": [ { "function": "minecraft:set_count", "count": { "min": 0, "max": 2 } } ]
+        }
+      ]
+    },
+    {
+      "rolls": 1,
+      "conditions": [ { "condition": "quality_api:entity_min_quality", "min_level": 4 } ],
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:leather",
+          "functions": [ { "function": "minecraft:set_count", "count": 5 } ]
+        }
+      ]
+    }
+  ]
+}

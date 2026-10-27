@@ -5,22 +5,30 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Equipable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.ItemAttributeModifierEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.TagsUpdatedEvent;
 import net.neoforged.neoforge.event.enchanting.GetEnchantmentLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingConversionEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.registries.datamaps.DataMapsUpdatedEvent;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
+import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
 import net.silvertide.quality_api.command.QualityCommand;
+import net.silvertide.quality_api.quality.EntityQualityModifiers;
 import net.silvertide.quality_api.quality.Snapshot;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,14 +36,42 @@ import org.jetbrains.annotations.Nullable;
 public final class QualityEvents {
     private QualityEvents() {}
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOW)
     static void onTagsUpdated(TagsUpdatedEvent event) {
-        if (event.shouldUpdateStaticData()) Snapshot.rebuild(event.getRegistryAccess());
+        if (!event.shouldUpdateStaticData()) return;
+        Snapshot.rebuild(event.getRegistryAccess());
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (event.getUpdateCause() == TagsUpdatedEvent.UpdateCause.SERVER_DATA_LOAD && server != null) {
+            EntityQualityModifiers.refreshLoadedEntities(server);
+        }
     }
 
     @SubscribeEvent
     static void onDataMapsUpdated(DataMapsUpdatedEvent event) {
-        if (event.getRegistryKey().equals(Registries.ITEM)) Snapshot.rebuild(event.getRegistries());
+        ResourceKey<?> registry = event.getRegistryKey();
+        boolean qualityDataSyncedToClient = event.getCause() == DataMapsUpdatedEvent.UpdateCause.CLIENT_SYNC
+                && (registry.equals(Registries.ITEM) || registry.equals(Registries.ENTITY_TYPE));
+        if (qualityDataSyncedToClient) Snapshot.rebuild(event.getRegistries());
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    static void onPlayerClone(PlayerEvent.Clone event) {
+        Player player = event.getEntity();
+        if (!player.hasData(QualityAPI.ENTITY_QUALITY)) return;
+        if (event.isWasDeath() && !Config.KEEP_PLAYER_QUALITY_ON_DEATH.get()) {
+            Qualities.remove(player);
+            return;
+        }
+        EntityQualityModifiers.refresh(player);
+        if (!event.isWasDeath()) player.setHealth(event.getOriginal().getHealth());
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    static void onLivingConvert(LivingConversionEvent.Post event) {
+        LivingEntity outcome = event.getOutcome();
+        if (!outcome.hasData(QualityAPI.ENTITY_QUALITY)) return;
+        outcome.syncData(QualityAPI.ENTITY_QUALITY);
+        EntityQualityModifiers.refresh(outcome);
     }
 
     @SubscribeEvent
