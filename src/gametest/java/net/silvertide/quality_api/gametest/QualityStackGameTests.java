@@ -343,6 +343,42 @@ public class QualityStackGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = EMPTY)
+    public static void pickingUpCarrotsFillsACarriedQualityStackFirst(GameTestHelper helper) {
+        ServerPlayer player = clickingPlayer(helper);
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, QualityStacks.poolIntoNewQualityStack(carrots(FINE, 10), carrots(SUPERIOR, 10)));
+        ItemEntity masterwork = dropAt(helper, carrots(MASTERWORK, 20));
+        masterwork.playerTouch(player);
+        helper.assertTrue(!masterwork.isAlive() && total(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) == 40 && looseCarrots(player) == 0,
+                "20 picked-up masterwork carrots should all go into the quality stack");
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, QualityStacks.poolIntoNewQualityStack(carrots(FINE, 64), carrots(SUPERIOR, 62)));
+        ItemEntity overflow = dropAt(helper, carrots(MASTERWORK, 10));
+        overflow.playerTouch(player);
+        helper.assertTrue(!overflow.isAlive() && total(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) == CARROT_CAPACITY && looseCarrots(player) == 8,
+                "what does not fit in the quality stack should be picked up normally");
+        ItemEntity potatoes = dropAt(helper, stack(Items.POTATO, FINE, 4));
+        potatoes.playerTouch(player);
+        helper.assertTrue(!potatoes.isAlive() && QualityStacks.contents(player.getInventory().getItem(FIRST_INVENTORY_SLOT)).accepts(carrots(FINE, 1)), "potatoes should be picked up normally and never enter a carrot quality stack");
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, QualityStacks.poolIntoNewQualityStack(carrots(FINE, 1), carrots(SUPERIOR, 1)));
+        ItemEntity justThrown = dropAt(helper, carrots(MASTERWORK, 5));
+        justThrown.setDefaultPickUpDelay();
+        justThrown.playerTouch(player);
+        helper.assertTrue(justThrown.isAlive() && total(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) == 2, "an item with a pickup delay should not be taken in");
+        justThrown.discard();
+        helper.succeed();
+    }
+
+    private static ItemEntity dropAt(GameTestHelper helper, ItemStack stack) {
+        Vec3 spot = helper.absoluteVec(new Vec3(1.5, 2.0, 1.5));
+        ItemEntity itemEntity = new ItemEntity(helper.getLevel(), spot.x, spot.y, spot.z, stack);
+        helper.getLevel().addFreshEntity(itemEntity);
+        return itemEntity;
+    }
+
+    private static int looseCarrots(ServerPlayer player) {
+        return player.getInventory().items.stream().filter(stack -> stack.is(Items.CARROT)).mapToInt(ItemStack::getCount).sum();
+    }
+
     private static void assertRejected(GameTestHelper helper, String snbt, String reason) {
         helper.assertTrue(parse(helper, snbt).isError(), "contents with " + reason + " should be rejected");
     }
