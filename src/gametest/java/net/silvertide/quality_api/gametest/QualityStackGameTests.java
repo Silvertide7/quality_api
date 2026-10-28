@@ -14,6 +14,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -25,6 +26,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.CommonHooks;
@@ -32,6 +34,7 @@ import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.silvertide.quality_api.QualityAPI;
+import net.silvertide.quality_api.api.Qualities;
 import net.silvertide.quality_api.stack.QualityStackContents;
 import net.silvertide.quality_api.stack.QualityStacks;
 import org.jetbrains.annotations.Nullable;
@@ -321,6 +324,25 @@ public class QualityStackGameTests {
         copyingContainer.setItem(0, new ItemStack(QualityAPI.QUALITY_STACK.get()));
         cursor.setItem(0, ItemStack.EMPTY);
         helper.assertFalse(rightClickWithEvent(player, copyingSlot, cursor), "a quality stack with no contents should fall through to vanilla");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void tooltipListsEachTierBestFirstWithTheTotal(GameTestHelper helper) {
+        ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 10), carrots(null, 3));
+        QualityStacks.insert(qualityStack, carrots(MASTERWORK, 20));
+        QualityStacks.insert(qualityStack, carrots(REMOVED_TIER, 2));
+        List<String> lines = qualityStack.getTooltipLines(Item.TooltipContext.EMPTY, null, TooltipFlag.NORMAL).stream().map(Component::getString).toList();
+        String masterwork = Qualities.displayName(carrots(MASTERWORK, 1), MASTERWORK).getString();
+        String fine = Qualities.displayName(carrots(FINE, 1), FINE).getString();
+        List<String> expected = List.of("Carrot", masterwork + " ×20", fine + " ×10", "Plain ×3", REMOVED_TIER + " ×2", "35 / 128");
+        helper.assertTrue(lines.equals(expected), "the tooltip should list tiers best first then the total, expected " + expected + " got " + lines);
+        helper.assertTrue(qualityStack.isBarVisible() && qualityStack.getBarColor() == Qualities.get(MASTERWORK).orElseThrow().color().getValue(), "the fill bar should show in the best tier's colour");
+        ItemStack full = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 64), carrots(SUPERIOR, 64));
+        helper.assertTrue(full.getBarWidth() == 13 && qualityStack.getBarWidth() < 13, "the fill bar should be full only at capacity");
+        ItemStack goldenApples = QualityStacks.poolIntoNewQualityStack(stack(Items.ENCHANTED_GOLDEN_APPLE, FINE, 1), stack(Items.ENCHANTED_GOLDEN_APPLE, SUPERIOR, 1));
+        helper.assertTrue(Objects.equals(goldenApples.getHoverName().getStyle().getColor(), TextColor.fromLegacyFormat(new ItemStack(Items.ENCHANTED_GOLDEN_APPLE).getRarity().color())) && goldenApples.hasFoil(),
+                "a quality stack should take its item's rarity colour and glint");
         helper.succeed();
     }
 

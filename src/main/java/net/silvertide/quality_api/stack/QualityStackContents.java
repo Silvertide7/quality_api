@@ -5,8 +5,11 @@ import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
@@ -103,7 +106,12 @@ public final class QualityStackContents {
     }
 
     public Component hoverName() {
-        return item.getHoverName();
+        MutableComponent name = Component.empty().append(item.getHoverName()).withStyle(item.getRarity().getStyleModifier());
+        return item.has(DataComponents.CUSTOM_NAME) ? name.withStyle(ChatFormatting.ITALIC) : name;
+    }
+
+    ItemStack template() {
+        return item;
     }
 
     public int maxStackSize() {
