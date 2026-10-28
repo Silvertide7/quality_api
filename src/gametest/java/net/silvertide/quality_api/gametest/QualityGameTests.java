@@ -69,6 +69,7 @@ import net.silvertide.quality_api.api.Qualities;
 import net.silvertide.quality_api.api.QualityCraftEvent;
 import net.silvertide.quality_api.api.QualityFoodEatenEvent;
 import net.silvertide.quality_api.api.QualityItemBrokenEvent;
+import net.silvertide.quality_api.api.QualityLootEvent;
 import net.silvertide.quality_api.craft.MinQualityIngredient;
 import net.silvertide.quality_api.quality.EntityQualityEffects;
 import net.silvertide.quality_api.quality.EntityQualityModifiers;
@@ -559,6 +560,38 @@ public class QualityGameTests {
     }
 
     @GameTest(template = EMPTY)
+    public static void lootEventSeesTheKillAndCanChangeTheTier(GameTestHelper helper) {
+        Cow cow = EntityType.COW.create(helper.getLevel());
+        ServerPlayer killer = FakePlayerFactory.get(helper.getLevel(), new GameProfile(UUID.randomUUID(), "loot-event-test"));
+        LootItemFunction copy = lootFunction(helper, "{\"function\": \"quality_api:copy_entity_quality\"}");
+        List<QualityLootEvent> seen = new ArrayList<>();
+        List<ResourceLocation> proposed = new ArrayList<>();
+        Consumer<QualityLootEvent> promotePlainDropsAndClearSuperiorOnes = event -> {
+            seen.add(event);
+            proposed.add(event.getQuality());
+            if (event.getSourceLevel().isEmpty()) event.setQuality(FINE);
+            else if (event.getSourceLevel().getAsDouble() >= 2) event.setQuality(null);
+        };
+        NeoForge.EVENT_BUS.addListener(promotePlainDropsAndClearSuperiorOnes);
+        try {
+            ItemStack plainCowBeef = copy.apply(new ItemStack(Items.BEEF), lootContextKilledBy(helper, cow, killer));
+            helper.assertTrue(FINE.equals(plainCowBeef.get(QualityAPI.QUALITY.get())), "a listener should be able to give a plain cow's beef a quality");
+            helper.assertTrue(seen.size() == 1 && seen.getFirst().getPlayer() == killer && seen.getFirst().getEntity() == cow && proposed.getFirst() == null,
+                    "the event for a plain cow should carry the killer, the cow and no proposed tier");
+            Qualities.apply(cow, SUPERIOR);
+            ItemStack superiorCowBeef = copy.apply(new ItemStack(Items.BEEF), lootContextKilledBy(helper, cow, killer));
+            helper.assertTrue(superiorCowBeef.get(QualityAPI.QUALITY.get()) == null, "a listener clearing the tier should leave the beef plain");
+            helper.assertTrue(seen.size() == 2 && seen.get(1).getSourceLevel().getAsDouble() == 2.0 && SUPERIOR.equals(proposed.get(1)),
+                    "the event for a superior cow should carry level 2 and propose superior");
+            copy.apply(withQuality(Items.BEEF, MASTERWORK), lootContextKilledBy(helper, cow, killer));
+            helper.assertTrue(seen.size() == 2, "an item that already has quality should not post the event");
+        } finally {
+            NeoForge.EVENT_BUS.unregister(promotePlainDropsAndClearSuperiorOnes);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
     public static void entityMinQualityConditionComparesLevels(GameTestHelper helper) {
         Cow cow = EntityType.COW.create(helper.getLevel());
         LootItemCondition atLeastSuperior = lootCondition(helper, "{\"condition\": \"quality_api:entity_min_quality\", \"min_level\": 2}");
@@ -830,6 +863,16 @@ public class QualityGameTests {
                 .withParameter(LootContextParams.THIS_ENTITY, entity)
                 .withParameter(LootContextParams.ORIGIN, entity.position())
                 .create(LootContextParamSets.ADVANCEMENT_ENTITY);
+        return new LootContext.Builder(params).create(Optional.empty());
+    }
+
+    private static LootContext lootContextKilledBy(GameTestHelper helper, Entity entity, ServerPlayer killer) {
+        LootParams params = new LootParams.Builder(helper.getLevel())
+                .withParameter(LootContextParams.THIS_ENTITY, entity)
+                .withParameter(LootContextParams.ORIGIN, entity.position())
+                .withParameter(LootContextParams.DAMAGE_SOURCE, helper.getLevel().damageSources().playerAttack(killer))
+                .withParameter(LootContextParams.LAST_DAMAGE_PLAYER, killer)
+                .create(LootContextParamSets.ENTITY);
         return new LootContext.Builder(params).create(Optional.empty());
     }
 

@@ -8,6 +8,7 @@
 - Entity attributes: entity type data map `quality_api:entity_qualities` gives entities attribute modifiers per tier. They are recomputed on apply, remove, load and reload, never saved, and max health changes keep the health percentage. Tier files do not apply to entities.
 - Entity quality survives player death and mob conversions; a converted mob uses its new type's attributes. Config `keepPlayerQualityOnDeath` (default true) clears a player's quality on death when off.
 - Loot function `quality_api:copy_entity_quality` (optional `level_offset`, fraction rolled) gives drops the dropping entity's quality, and loot condition `quality_api:entity_min_quality` (`min_level`) gates drops on it.
+- `QualityLootEvent` fires whenever `copy_entity_quality` decides a drop's tier, with the killing player, the entity, its level and the proposed tier; `setQuality` changes the result, so a skill mod can decide drop quality. It fires for entities without quality too.
 - `/quality entity <targets> set <tier>` and `/quality entity <targets> remove`. Set messages show the tier id next to the display word, e.g. "Set Steve to Legendary (quality_api:masterwork)".
 - `Qualities.forLevel(double, random)` rolls the fraction without a stack.
 

@@ -183,7 +183,7 @@ Entities use the same format in `data/quality_api/data_maps/entity_type/name_set
 
 An attribute the entity type does not have (for example `attack_damage` on a cow) is skipped silently. The modifiers are not saved on the entity; they are recomputed on load and on `/reload`, so changing the file reaches existing entities. When max health changes, current health keeps the same percentage.
 
-**Drops that follow the entity.** Add `quality_api:copy_entity_quality` to an entity loot table entry and the dropped item takes the entity's level plus `level_offset` (optional, default 0, fractions rolled, so `-0.5` drops one tier lower half the time). The nearest tier the item can take is used, so blacklisted items and `items` filters are respected; an item that already has a quality keeps it, and an entity without quality drops plain items. The `quality_api:entity_min_quality` condition (`min_level`) passes when the entity's level is at least that, with no quality counting as 0 like the `min_quality` ingredient. Both read `this_entity`, which is the dropping mob only in entity loot tables (and in barter, gift and bogged shearing tables); in chest, block, archaeology and vault tables it is the player, so the drop would copy the player's quality, and in fishing tables it is the hook. Use them in entity loot tables. In 1.21.1 sheep wool from shearing, chicken eggs and milk are not loot tables, so those need code.
+**Drops that follow the entity.** Add `quality_api:copy_entity_quality` to an entity loot table entry and the dropped item takes the entity's level plus `level_offset` (optional, default 0, fractions rolled, so `-0.5` drops one tier lower half the time). The nearest tier the item can take is used, so blacklisted items and `items` filters are respected; an item that already has a quality keeps it, and an entity without quality drops plain items unless a `QualityLootEvent` listener picks a tier. The `quality_api:entity_min_quality` condition (`min_level`) passes when the entity's level is at least that, with no quality counting as 0 like the `min_quality` ingredient. Both read `this_entity`, which is the dropping mob only in entity loot tables (and in barter, gift and bogged shearing tables); in chest, block, archaeology and vault tables it is the player, so the drop would copy the player's quality, and in fishing tables it is the hook. Use them in entity loot tables. In 1.21.1 sheep wool from shearing, chicken eggs and milk are not loot tables, so those need code.
 
 ```json
 {
@@ -208,6 +208,19 @@ An attribute the entity type does not have (for example `attack_damage` on a cow
 ```
 
 A tier at level 0 (`standard`) is still a component, so standard beef stacks separately from plain beef. An offset never makes the drop plain (the nearest tier is always used), so put the condition on the function, as above, to copy only from fine or better animals. Each pool rolls its entries independently, which is why the bonus leather has its own pool.
+
+**Changing what drops.** Each time `copy_entity_quality` runs on an item without a quality, it posts `QualityLootEvent` (server side, not cancellable, once per dropped stack) before applying anything. It carries the stack, the `LootContext` (tool, origin, damage source, `getRandom()`), the killing player (`@Nullable ServerPlayer`, from `last_damage_player`), the entity, the entity's level (`OptionalDouble`, empty when it has no quality) and the proposed tier (the level plus `level_offset`, rolled, or null). Call `setQuality(id)` to change it or `setQuality(null)` for a plain drop. A skill mod reads the player and the source level and rolls its own tier:
+
+```java
+@SubscribeEvent
+static void onQualityLoot(QualityLootEvent event) {
+    if (event.getPlayer() == null || event.getSourceLevel().isEmpty()) return;
+    double level = event.getSourceLevel().getAsDouble() * skillFraction(event.getPlayer());
+    event.setQuality(Qualities.forLevel(event.getStack(), level, event.getContext().getRandom()).orElse(null));
+}
+```
+
+The event only fires where a loot table runs the function, and a condition on the function (like `entity_min_quality` above) stops it for entities below that level. To let listeners decide every drop, including drops from entities without quality, leave the function unconditioned.
 
 **Non-damageable carriers.** Ingots, gems, and tool heads can hold quality without gaining durability. Nothing special is required. Quality on stackables only makes them stack separately from plain ones.
 
