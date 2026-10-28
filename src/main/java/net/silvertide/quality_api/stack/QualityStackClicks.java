@@ -59,7 +59,7 @@ public final class QualityStackClicks {
             playSound(player, SoundEvents.BUNDLE_REMOVE_ONE);
             return true;
         }
-        if (!contents.accepts(carried) || !slotHoldsFullStacksOf(slot, carried)) return false;
+        if (!contents.accepts(carried) || slotHoldsLessThanAFullStackOf(slot, carried)) return false;
         if (QualityStacks.insert(qualityStack, carried) > 0) {
             writeBack(slot, qualityStack);
             playSound(player, SoundEvents.BUNDLE_INSERT);
@@ -72,13 +72,13 @@ public final class QualityStackClicks {
         slot.set(QualityStacks.collapseToSingleStack(qualityStack).orElse(remaining));
     }
 
-    private static boolean slotHoldsFullStacksOf(Slot slot, ItemStack stack) {
-        return slot.getMaxStackSize(stack) >= stack.getMaxStackSize();
+    private static boolean slotHoldsLessThanAFullStackOf(Slot slot, ItemStack stack) {
+        return slot.getMaxStackSize(stack) < stack.getMaxStackSize();
     }
 
     private static boolean carriedPoolsWithSlot(ItemStack carried, Slot slot, Player player, SlotAccess carriedAccess) {
         ItemStack inSlot = slot.getItem();
-        if (ItemStack.isSameItemSameComponents(carried, inSlot) || !QualityStacks.canPool(inSlot, carried) || !slot.allowModification(player) || !slotHoldsFullStacksOf(slot, inSlot)) return false;
+        if (ItemStack.isSameItemSameComponents(carried, inSlot) || !QualityStacks.canPool(inSlot, carried) || !slot.allowModification(player) || slotHoldsLessThanAFullStackOf(slot, inSlot)) return false;
         ItemStack slotRemainder = inSlot.copy();
         ItemStack carriedRemainder = carried.copy();
         ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(slotRemainder, carriedRemainder);

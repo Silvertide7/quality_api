@@ -14,7 +14,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextColor;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -51,7 +51,6 @@ import java.util.UUID;
 @PrefixGameTestTemplate(false)
 public class QualityStackGameTests {
     private static final String EMPTY = "empty";
-    private static final ResourceLocation CRUDE = QualityAPI.id("crude");
     private static final ResourceLocation STANDARD = QualityAPI.id("standard");
     private static final ResourceLocation FINE = QualityAPI.id("fine");
     private static final ResourceLocation SUPERIOR = QualityAPI.id("superior");
@@ -338,7 +337,7 @@ public class QualityStackGameTests {
         List<String> expected = List.of("Carrot", masterwork + " ×20", fine + " ×10", "Plain ×3", REMOVED_TIER + " ×2", "35 / 128");
         helper.assertTrue(lines.equals(expected), "the tooltip should list tiers best first then the total, expected " + expected + " got " + lines);
         ItemStack goldenApples = QualityStacks.poolIntoNewQualityStack(stack(Items.ENCHANTED_GOLDEN_APPLE, FINE, 1), stack(Items.ENCHANTED_GOLDEN_APPLE, SUPERIOR, 1));
-        helper.assertTrue(Objects.equals(goldenApples.getHoverName().getStyle().getColor(), TextColor.fromLegacyFormat(new ItemStack(Items.ENCHANTED_GOLDEN_APPLE).getRarity().color())) && goldenApples.hasFoil(),
+        helper.assertTrue(Objects.equals(goldenApples.getHoverName().getStyle().getColor(), new ItemStack(Items.ENCHANTED_GOLDEN_APPLE).getRarity().getStyleModifier().apply(Style.EMPTY).getColor()) && goldenApples.hasFoil(),
                 "a quality stack should take its item's rarity colour and glint");
         helper.succeed();
     }
