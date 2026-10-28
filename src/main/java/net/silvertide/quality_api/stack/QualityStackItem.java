@@ -16,9 +16,6 @@ import java.util.List;
 import java.util.Optional;
 
 public class QualityStackItem extends Item {
-    private static final int FULL_BAR_WIDTH = 13;
-    private static final int PLAIN_BAR_COLOR = 0x6666FF;
-
     public QualityStackItem(Properties properties) {
         super(properties);
     }
@@ -33,28 +30,6 @@ public class QualityStackItem extends Item {
     public boolean isFoil(ItemStack stack) {
         QualityStackContents contents = QualityStacks.contents(stack);
         return contents != null && contents.template().hasFoil();
-    }
-
-    @Override
-    public boolean isBarVisible(ItemStack stack) {
-        return QualityStacks.contents(stack) != null;
-    }
-
-    @Override
-    public int getBarWidth(ItemStack stack) {
-        QualityStackContents contents = QualityStacks.contents(stack);
-        if (contents == null) return 0;
-        return Math.min(1 + (FULL_BAR_WIDTH - 1) * contents.total() / contents.capacity(), FULL_BAR_WIDTH);
-    }
-
-    @Override
-    public int getBarColor(ItemStack stack) {
-        QualityStackContents contents = QualityStacks.contents(stack);
-        if (contents == null || contents.isEmpty()) return PLAIN_BAR_COLOR;
-        return contents.entriesBestFirst().getFirst().tier()
-                .flatMap(Qualities::get)
-                .map(quality -> quality.color().getValue())
-                .orElse(PLAIN_BAR_COLOR);
     }
 
     @Override

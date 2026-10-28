@@ -9,9 +9,11 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.ItemOverrides;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
@@ -25,8 +27,10 @@ import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.model.BakedModelWrapper;
 import net.silvertide.quality_api.QualityAPI;
+import net.silvertide.quality_api.api.Qualities;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Optional;
 import java.util.function.Supplier;
 
 @EventBusSubscriber(modid = QualityAPI.MOD_ID, value = Dist.CLIENT)
@@ -35,8 +39,16 @@ public final class QualityStackRendering {
     private static final int NO_TINT = -1;
     private static final int COUNT_RIGHT_EDGE = 17;
     private static final int COUNT_TOP = 9;
-    private static final float COUNT_LAYER = 200.0F;
-    private static final int COUNT_COLOR = 0xFFFFFF;
+    private static final float OVERLAY_LAYER = 200.0F;
+    private static final int WHITE = 0xFFFFFF;
+    private static final int PLAIN_COLOR = 0xAAAAAA;
+    private static final int BAR_BACKGROUND_COLOR = 0x000000;
+    private static final int OPAQUE = 0xFF000000;
+    private static final int BAR_LEFT = 2;
+    private static final int BAR_TOP = 1;
+    private static final int BAR_WIDTH = 13;
+    private static final int BAR_HEIGHT = 1;
+    private static final int BAR_BACKGROUND_HEIGHT = 2;
     private static final Supplier<BlockEntityWithoutLevelRenderer> HELD_ITEM_RENDERER = Suppliers.memoize(HeldItemRenderer::new);
 
     private QualityStackRendering() {}
@@ -66,19 +78,38 @@ public final class QualityStackRendering {
     }
 
     @SubscribeEvent
-    static void drawTotalCount(RegisterItemDecorationsEvent event) {
-        event.register(QualityAPI.QUALITY_STACK.get(), QualityStackRendering::drawTotalCount);
+    static void drawCountAndTierBar(RegisterItemDecorationsEvent event) {
+        event.register(QualityAPI.QUALITY_STACK.get(), QualityStackRendering::drawCountAndTierBar);
     }
 
-    private static boolean drawTotalCount(GuiGraphics graphics, Font font, ItemStack stack, int x, int y) {
+    private static boolean drawCountAndTierBar(GuiGraphics graphics, Font font, ItemStack stack, int x, int y) {
         QualityStackContents contents = QualityStacks.contents(stack);
         if (contents == null) return false;
         String total = String.valueOf(contents.total());
         graphics.pose().pushPose();
-        graphics.pose().translate(0.0F, 0.0F, COUNT_LAYER);
-        graphics.drawString(font, total, x + COUNT_RIGHT_EDGE - font.width(total), y + COUNT_TOP, COUNT_COLOR, true);
+        graphics.pose().translate(0.0F, 0.0F, OVERLAY_LAYER);
+        graphics.drawString(font, total, x + COUNT_RIGHT_EDGE - font.width(total), y + COUNT_TOP, WHITE, true);
+        drawTierBar(graphics, contents, x + BAR_LEFT, y + BAR_TOP);
         graphics.pose().popPose();
         return false;
+    }
+
+    private static void drawTierBar(GuiGraphics graphics, QualityStackContents contents, int left, int top) {
+        graphics.fill(RenderType.guiOverlay(), left, top, left + BAR_WIDTH, top + BAR_BACKGROUND_HEIGHT, OPAQUE | BAR_BACKGROUND_COLOR);
+        int countSoFar = 0;
+        int segmentStart = 0;
+        for (QualityStackContents.Entry entry : contents.entriesBestFirst()) {
+            countSoFar += entry.count();
+            int segmentEnd = Math.min(Math.max(BAR_WIDTH * countSoFar / contents.capacity(), segmentStart + 1), BAR_WIDTH);
+            if (segmentEnd > segmentStart) {
+                graphics.fill(RenderType.guiOverlay(), left + segmentStart, top, left + segmentEnd, top + BAR_HEIGHT, OPAQUE | colorOf(entry.tier()));
+            }
+            segmentStart = segmentEnd;
+        }
+    }
+
+    private static int colorOf(Optional<ResourceLocation> tier) {
+        return tier.flatMap(Qualities::get).map(quality -> quality.color().getValue()).orElse(PLAIN_COLOR);
     }
 
     private static final class HeldItemModel extends BakedModelWrapper<BakedModel> {

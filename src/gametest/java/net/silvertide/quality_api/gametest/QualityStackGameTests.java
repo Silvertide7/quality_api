@@ -337,9 +337,6 @@ public class QualityStackGameTests {
         String fine = Qualities.displayName(carrots(FINE, 1), FINE).getString();
         List<String> expected = List.of("Carrot", masterwork + " ×20", fine + " ×10", "Plain ×3", REMOVED_TIER + " ×2", "35 / 128");
         helper.assertTrue(lines.equals(expected), "the tooltip should list tiers best first then the total, expected " + expected + " got " + lines);
-        helper.assertTrue(qualityStack.isBarVisible() && qualityStack.getBarColor() == Qualities.get(MASTERWORK).orElseThrow().color().getValue(), "the fill bar should show in the best tier's colour");
-        ItemStack full = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 64), carrots(SUPERIOR, 64));
-        helper.assertTrue(full.getBarWidth() == 13 && qualityStack.getBarWidth() < 13, "the fill bar should be full only at capacity");
         ItemStack goldenApples = QualityStacks.poolIntoNewQualityStack(stack(Items.ENCHANTED_GOLDEN_APPLE, FINE, 1), stack(Items.ENCHANTED_GOLDEN_APPLE, SUPERIOR, 1));
         helper.assertTrue(Objects.equals(goldenApples.getHoverName().getStyle().getColor(), TextColor.fromLegacyFormat(new ItemStack(Items.ENCHANTED_GOLDEN_APPLE).getRarity().color())) && goldenApples.hasFoil(),
                 "a quality stack should take its item's rarity colour and glint");
