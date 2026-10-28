@@ -26,6 +26,7 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.neoforged.neoforge.registries.datamaps.AdvancedDataMapType;
@@ -38,6 +39,8 @@ import net.silvertide.quality_api.loot.RollQualityModifier;
 import net.silvertide.quality_api.quality.EntityQualityEffects;
 import net.silvertide.quality_api.quality.Quality;
 import net.silvertide.quality_api.quality.QualityEffects;
+import net.silvertide.quality_api.stack.QualityStackContents;
+import net.silvertide.quality_api.stack.QualityStackItem;
 import org.slf4j.Logger;
 
 import java.util.Map;
@@ -59,6 +62,17 @@ public class QualityAPI {
             DATA_COMPONENTS.registerComponentType("crafter", builder -> builder
                     .persistent(Codec.STRING)
                     .networkSynchronized(ByteBufCodecs.STRING_UTF8));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<QualityStackContents>> QUALITY_STACK_CONTENTS =
+            DATA_COMPONENTS.registerComponentType("quality_stack_contents", builder -> builder
+                    .persistent(QualityStackContents.CODEC)
+                    .networkSynchronized(QualityStackContents.STREAM_CODEC)
+                    .cacheEncoding());
+
+    private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MOD_ID);
+
+    public static final DeferredItem<QualityStackItem> QUALITY_STACK =
+            ITEMS.registerItem("quality_stack", QualityStackItem::new, new Item.Properties().stacksTo(1));
 
     private static final DeferredRegister<AttachmentType<?>> ATTACHMENT_TYPES =
             DeferredRegister.create(NeoForgeRegistries.ATTACHMENT_TYPES, MOD_ID);
@@ -104,6 +118,7 @@ public class QualityAPI {
 
     public QualityAPI(IEventBus modEventBus, ModContainer container) {
         DATA_COMPONENTS.register(modEventBus);
+        ITEMS.register(modEventBus);
         ATTACHMENT_TYPES.register(modEventBus);
         RollQualityModifier.register(modEventBus);
         CopyEntityQualityFunction.register(modEventBus);
