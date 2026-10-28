@@ -1,3 +1,10 @@
+1.5.0
+---
+- Quality stacks: one slot holds up to 2 stacks' worth of one item across every tier (128 carrots), so quality no longer splits an inventory into dozens of stacks. Right-click an item onto the same item of another quality to make one; right-click items onto it to add them; right-click it with an empty cursor to take the best tier out; carry it and right-click a slot to take that slot's items in, or an empty slot to put its best tier down. Left-click stays vanilla. It turns back into a normal stack when one tier that fits a stack is left.
+- Quality stacks look like the item they hold, show the total count and a bar along the top split by tier colour, and list each tier with its count in the tooltip.
+- Items you pick up go into a quality stack you carry first; anything that does not fit is picked up normally.
+- A quality stack destroyed by fire, lava or a cactus spills its contents. Only stackable, undamageable items can be pooled, and only when everything but quality matches.
+
 1.4.0
 ---
 - Name sets: the item data map `quality_api:name_set` gives items their own words for each tier (food reads Poor, Common, Fine, Choice, Prime, Gourmet). New `Qualities.displayName(id, nameSet)`, `Qualities.displayName(stack, id)` and `Qualities.nameSet(stack)`; tooltips and `/quality set` use the item's set.
