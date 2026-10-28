@@ -57,6 +57,9 @@ public final class QualityStackContents {
     private final ItemStack item;
     private final List<Entry> entries;
     private final long total;
+    private volatile BestFirstOrder bestFirstOrder;
+
+    private record BestFirstOrder(Snapshot snapshot, List<Entry> entries) {}
 
     private QualityStackContents(ItemStack item, List<Entry> entries) {
         this.item = item.copyWithCount(1);
@@ -139,7 +142,15 @@ public final class QualityStackContents {
     }
 
     public List<Entry> entriesBestFirst() {
-        Map<ResourceLocation, Quality> tiers = Snapshot.current().tiers();
+        Snapshot snapshot = Snapshot.current();
+        BestFirstOrder cached = bestFirstOrder;
+        if (cached != null && cached.snapshot() == snapshot) return cached.entries();
+        List<Entry> entriesBestFirst = sortedBestFirst(snapshot.tiers());
+        bestFirstOrder = new BestFirstOrder(snapshot, entriesBestFirst);
+        return entriesBestFirst;
+    }
+
+    private List<Entry> sortedBestFirst(Map<ResourceLocation, Quality> tiers) {
         Comparator<Entry> bestFirst = Comparator
                 .comparing((Entry entry) -> entry.tier().isPresent() && !tiers.containsKey(entry.tier().get()))
                 .thenComparing(entry -> -entry.tier().map(tiers::get).map(Quality::level).orElse(0))

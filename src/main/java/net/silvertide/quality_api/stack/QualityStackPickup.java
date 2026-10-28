@@ -18,6 +18,8 @@ import java.util.UUID;
 
 @EventBusSubscriber(modid = QualityAPI.MOD_ID)
 public final class QualityStackPickup {
+    private static final int PICKUP_POP_TICKS = 5;
+
     private QualityStackPickup() {}
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -32,13 +34,20 @@ public final class QualityStackPickup {
         player.getInventory().setChanged();
         EventHooks.fireItemPickupPost(itemEntity, player, beforePickup);
         player.take(itemEntity, moved);
-        player.awardStat(Stats.ITEM_PICKED_UP.get(beforePickup.getItem()), moved);
-        player.onItemPickup(itemEntity);
-        if (picked.isEmpty()) {
+        boolean usedUp = picked.isEmpty();
+        if (usedUp) {
             itemEntity.discard();
-            picked.setCount(moved);
             event.setCanPickup(TriState.FALSE);
         }
+        player.awardStat(Stats.ITEM_PICKED_UP.get(beforePickup.getItem()), moved);
+        if (usedUp) triggerPickupCriteriaWithPickedCount(player, itemEntity, moved);
+        else player.onItemPickup(itemEntity);
+    }
+
+    private static void triggerPickupCriteriaWithPickedCount(Player player, ItemEntity itemEntity, int pickedCount) {
+        itemEntity.getItem().setCount(pickedCount);
+        player.onItemPickup(itemEntity);
+        itemEntity.getItem().setCount(0);
     }
 
     private static boolean mayPickUp(ItemEntityPickupEvent.Pre event, Player player, ItemEntity itemEntity) {
@@ -53,7 +62,9 @@ public final class QualityStackPickup {
         int moved = 0;
         for (ItemStack held : Iterables.concat(inventory.items, inventory.offhand)) {
             if (picked.isEmpty()) break;
-            moved += QualityStacks.insert(held, picked);
+            int movedIntoHeld = QualityStacks.insert(held, picked);
+            if (movedIntoHeld > 0) held.setPopTime(PICKUP_POP_TICKS);
+            moved += movedIntoHeld;
         }
         return moved;
     }

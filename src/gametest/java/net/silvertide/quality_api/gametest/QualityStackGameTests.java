@@ -351,6 +351,7 @@ public class QualityStackGameTests {
         masterwork.playerTouch(player);
         helper.assertTrue(!masterwork.isAlive() && total(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) == 40 && looseCarrots(player) == 0,
                 "20 picked-up masterwork carrots should all go into the quality stack");
+        helper.assertTrue(masterwork.getItem().isEmpty(), "a used-up item entity should hold nothing, so a later pickup listener cannot hand its carrots out again");
         player.getInventory().setItem(FIRST_INVENTORY_SLOT, QualityStacks.poolIntoNewQualityStack(carrots(FINE, 64), carrots(SUPERIOR, 62)));
         ItemEntity overflow = dropAt(helper, carrots(MASTERWORK, 10));
         overflow.playerTouch(player);
