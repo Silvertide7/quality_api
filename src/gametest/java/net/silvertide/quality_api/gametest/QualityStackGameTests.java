@@ -121,7 +121,7 @@ public class QualityStackGameTests {
         assertExtracts(helper, qualityStack, null, 3);
         assertExtracts(helper, qualityStack, REMOVED_TIER, 2);
         helper.assertTrue(qualityStack.isEmpty(), "the quality stack should be gone once its last item is taken");
-        helper.assertTrue(QualityStacks.extractBest(qualityStack, Integer.MAX_VALUE).isEmpty(), "an empty quality stack should give nothing");
+        helper.assertTrue(QualityStacks.extractNext(qualityStack, Integer.MAX_VALUE).isEmpty(), "an empty quality stack should give nothing");
         helper.succeed();
     }
 
@@ -334,7 +334,7 @@ public class QualityStackGameTests {
         List<String> lines = qualityStack.getTooltipLines(Item.TooltipContext.EMPTY, null, TooltipFlag.NORMAL).stream().map(Component::getString).toList();
         String masterwork = Qualities.displayName(carrots(MASTERWORK, 1), MASTERWORK).getString();
         String fine = Qualities.displayName(carrots(FINE, 1), FINE).getString();
-        List<String> expected = List.of("Carrot", masterwork + " ×20", fine + " ×10", "Plain ×3", REMOVED_TIER + " ×2", "35 / 128");
+        List<String> expected = List.of("Carrot", masterwork + " ×20", fine + " ×10", "Plain ×3", REMOVED_TIER + " ×2", "35 / 128", "Scroll to Select - Right Click to Remove");
         helper.assertTrue(lines.equals(expected), "the tooltip should list tiers best first then the total, expected " + expected + " got " + lines);
         ItemStack goldenApples = QualityStacks.poolIntoNewQualityStack(stack(Items.ENCHANTED_GOLDEN_APPLE, FINE, 1), stack(Items.ENCHANTED_GOLDEN_APPLE, SUPERIOR, 1));
         helper.assertTrue(Objects.equals(goldenApples.getHoverName().getStyle().getColor(), new ItemStack(Items.ENCHANTED_GOLDEN_APPLE).getRarity().getStyleModifier().apply(Style.EMPTY).getColor()) && goldenApples.hasFoil(),
@@ -379,6 +379,35 @@ public class QualityStackGameTests {
         return player.getInventory().items.stream().filter(stack -> stack.is(Items.CARROT)).mapToInt(ItemStack::getCount).sum();
     }
 
+    @GameTest(template = EMPTY)
+    public static void aChosenTierComesOutFirstUntilItRunsOut(GameTestHelper helper) {
+        ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 10), carrots(MASTERWORK, 20));
+        QualityStacks.insert(qualityStack, carrots(null, 3));
+        helper.assertTrue(QualityStacks.nextOut(qualityStack).tier().equals(Optional.of(MASTERWORK)), "with nothing chosen the best tier should come out");
+        helper.assertTrue(QualityStacks.select(qualityStack, Optional.of(FINE)), "a tier the quality stack holds should be choosable");
+        helper.assertFalse(QualityStacks.select(qualityStack, Optional.of(SUPERIOR)), "a tier the quality stack does not hold should be refused");
+        assertExtracts(helper, qualityStack, FINE, 10);
+        helper.assertTrue(QualityStacks.nextOut(qualityStack).tier().equals(Optional.of(MASTERWORK)) && !qualityStack.has(QualityAPI.QUALITY_STACK_SELECTION.get()),
+                "once the chosen tier runs out the choice should clear and the best tier come out again");
+        helper.assertTrue(QualityStacks.selectNeighbour(qualityStack, 1).tier().isEmpty(), "scrolling toward worse from masterwork should choose plain");
+        helper.assertTrue(QualityStacks.selectNeighbour(qualityStack, 1).tier().equals(Optional.of(MASTERWORK)), "scrolling past the worst should wrap to the best");
+        helper.assertTrue(QualityStacks.selectNeighbour(qualityStack, -1).tier().isEmpty(), "scrolling toward better from the best should wrap to the worst");
+
+        RegistryAccess registries = helper.getLevel().registryAccess();
+        Tag saved = ItemStack.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), qualityStack).getOrThrow();
+        ItemStack loaded = ItemStack.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), saved).getOrThrow();
+        helper.assertTrue(!loaded.has(QualityAPI.QUALITY_STACK_SELECTION.get()) && total(loaded) == total(qualityStack), "the choice should not be saved, only the contents");
+
+        ServerPlayer player = clickingPlayer(helper);
+        ItemStack inSlot = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 10), carrots(MASTERWORK, 20));
+        QualityStacks.select(inSlot, Optional.of(FINE));
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, inSlot);
+        rightClick(player, FIRST_INVENTORY_SLOT);
+        helper.assertTrue(isCarrots(player.inventoryMenu.getCarried(), FINE, 10) && isCarrots(player.getInventory().getItem(FIRST_INVENTORY_SLOT), MASTERWORK, 20),
+                "right-clicking should take out the chosen tier, then the last tier left should turn back into normal carrots");
+        helper.succeed();
+    }
+
     private static void assertRejected(GameTestHelper helper, String snbt, String reason) {
         helper.assertTrue(parse(helper, snbt).isError(), "contents with " + reason + " should be rejected");
     }
@@ -393,7 +422,7 @@ public class QualityStackGameTests {
 
     private static void assertExtracts(GameTestHelper helper, ItemStack qualityStack, @Nullable ResourceLocation tier, int count) {
         int totalBefore = total(qualityStack);
-        ItemStack extracted = QualityStacks.extractBest(qualityStack, Integer.MAX_VALUE);
+        ItemStack extracted = QualityStacks.extractNext(qualityStack, Integer.MAX_VALUE);
         helper.assertTrue(extracted.is(Items.CARROT) && extracted.getCount() == count && Objects.equals(tier, extracted.get(QualityAPI.QUALITY.get())),
                 "expected " + count + " carrots of " + tier + ", got " + extracted.getCount() + " of " + extracted.get(QualityAPI.QUALITY.get()));
         helper.assertTrue(total(qualityStack) == totalBefore - count, "extracting should remove exactly what came out");

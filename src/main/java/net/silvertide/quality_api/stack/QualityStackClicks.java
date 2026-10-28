@@ -32,10 +32,10 @@ public final class QualityStackClicks {
     private static boolean carriedQualityStackClicksSlot(ItemStack qualityStack, Slot slot, Player player, SlotAccess carriedAccess) {
         ItemStack inSlot = slot.getItem();
         if (inSlot.isEmpty()) {
-            ItemStack best = QualityStacks.peekBest(qualityStack);
-            int fits = slot.mayPlace(best) ? Math.min(best.getCount(), slot.getMaxStackSize(best)) : 0;
+            ItemStack next = QualityStacks.peekNext(qualityStack);
+            int fits = slot.mayPlace(next) ? Math.min(next.getCount(), slot.getMaxStackSize(next)) : 0;
             if (fits <= 0) return true;
-            slot.setByPlayer(QualityStacks.extractBest(qualityStack, fits));
+            slot.setByPlayer(QualityStacks.extractNext(qualityStack, fits));
             QualityStacks.collapseToSingleStack(qualityStack).ifPresent(carriedAccess::set);
             playSound(player, SoundEvents.BUNDLE_REMOVE_ONE);
             return true;
@@ -54,7 +54,7 @@ public final class QualityStackClicks {
         QualityStackContents contents = QualityStacks.contents(qualityStack);
         if (contents == null || !slot.allowModification(player)) return false;
         if (carried.isEmpty()) {
-            carriedAccess.set(QualityStacks.extractBest(qualityStack, Integer.MAX_VALUE));
+            carriedAccess.set(QualityStacks.extractNext(qualityStack, Integer.MAX_VALUE));
             writeBack(slot, qualityStack);
             playSound(player, SoundEvents.BUNDLE_REMOVE_ONE);
             return true;

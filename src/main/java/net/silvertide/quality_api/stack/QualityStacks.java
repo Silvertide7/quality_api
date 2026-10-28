@@ -5,6 +5,7 @@ import net.minecraft.world.item.ItemStack;
 import net.silvertide.quality_api.QualityAPI;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.Optional;
 
 public final class QualityStacks {
@@ -42,22 +43,55 @@ public final class QualityStacks {
         return moved;
     }
 
-    public static ItemStack peekBest(ItemStack qualityStack) {
+    @Nullable
+    public static QualityStackContents.Entry nextOut(ItemStack qualityStack) {
         QualityStackContents contents = contents(qualityStack);
-        if (contents == null || contents.isEmpty()) return ItemStack.EMPTY;
-        QualityStackContents.Entry best = contents.entriesBestFirst().getFirst();
-        return contents.stackOf(best.tier(), Math.min(best.count(), contents.maxStackSize()));
+        if (contents == null || contents.isEmpty()) return null;
+        QualityStackSelection selection = qualityStack.get(QualityAPI.QUALITY_STACK_SELECTION.get());
+        if (selection != null) {
+            for (QualityStackContents.Entry entry : contents.entries()) {
+                if (entry.tier().equals(selection.tier())) return entry;
+            }
+        }
+        return contents.entriesBestFirst().getFirst();
     }
 
-    public static ItemStack extractBest(ItemStack qualityStack, int maxCount) {
+    public static boolean select(ItemStack qualityStack, Optional<ResourceLocation> tier) {
         QualityStackContents contents = contents(qualityStack);
-        if (contents == null || contents.isEmpty() || maxCount <= 0) return ItemStack.EMPTY;
-        QualityStackContents.Entry best = contents.entriesBestFirst().getFirst();
-        int taken = Math.min(Math.min(best.count(), contents.maxStackSize()), maxCount);
-        QualityStackContents remaining = contents.minus(best.tier(), taken);
+        if (contents == null || contents.entries().stream().noneMatch(entry -> entry.tier().equals(tier))) return false;
+        qualityStack.set(QualityAPI.QUALITY_STACK_SELECTION.get(), new QualityStackSelection(tier));
+        return true;
+    }
+
+    @Nullable
+    public static QualityStackContents.Entry selectNeighbour(ItemStack qualityStack, int stepsTowardWorse) {
+        QualityStackContents contents = contents(qualityStack);
+        QualityStackContents.Entry current = nextOut(qualityStack);
+        if (contents == null || current == null) return null;
+        List<QualityStackContents.Entry> entriesBestFirst = contents.entriesBestFirst();
+        int neighbourIndex = Math.floorMod(entriesBestFirst.indexOf(current) + stepsTowardWorse, entriesBestFirst.size());
+        QualityStackContents.Entry neighbour = entriesBestFirst.get(neighbourIndex);
+        select(qualityStack, neighbour.tier());
+        return neighbour;
+    }
+
+    public static ItemStack peekNext(ItemStack qualityStack) {
+        QualityStackContents contents = contents(qualityStack);
+        QualityStackContents.Entry next = nextOut(qualityStack);
+        if (contents == null || next == null) return ItemStack.EMPTY;
+        return contents.stackOf(next.tier(), Math.min(next.count(), contents.maxStackSize()));
+    }
+
+    public static ItemStack extractNext(ItemStack qualityStack, int maxCount) {
+        QualityStackContents contents = contents(qualityStack);
+        QualityStackContents.Entry next = nextOut(qualityStack);
+        if (contents == null || next == null || maxCount <= 0) return ItemStack.EMPTY;
+        int taken = Math.min(Math.min(next.count(), contents.maxStackSize()), maxCount);
+        QualityStackContents remaining = contents.minus(next.tier(), taken);
         if (remaining.isEmpty()) qualityStack.setCount(0);
         else qualityStack.set(QualityAPI.QUALITY_STACK_CONTENTS.get(), remaining);
-        return contents.stackOf(best.tier(), taken);
+        if (taken == next.count()) qualityStack.remove(QualityAPI.QUALITY_STACK_SELECTION.get());
+        return contents.stackOf(next.tier(), taken);
     }
 
     public static Optional<ItemStack> collapseToSingleStack(ItemStack qualityStack) {

@@ -5,6 +5,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemUtils;
@@ -33,6 +34,16 @@ public class QualityStackItem extends Item {
     }
 
     @Override
+    public Optional<TooltipComponent> getTooltipImage(ItemStack stack) {
+        QualityStackContents contents = QualityStacks.contents(stack);
+        QualityStackContents.Entry next = QualityStacks.nextOut(stack);
+        if (contents == null || next == null) return Optional.empty();
+        List<QualityStackContents.Entry> entriesBestFirst = contents.entriesBestFirst();
+        List<ItemStack> tierStacksBestFirst = entriesBestFirst.stream().map(entry -> contents.stackOf(entry.tier(), entry.count())).toList();
+        return Optional.of(new QualityStackTooltip(tierStacksBestFirst, entriesBestFirst.indexOf(next)));
+    }
+
+    @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
         QualityStackContents contents = QualityStacks.contents(stack);
         if (contents == null) return;
@@ -40,6 +51,7 @@ public class QualityStackItem extends Item {
             lines.add(Component.translatable("quality_api.tooltip.quality_stack.entry", tierName(contents, entry.tier()), entry.count()).withStyle(ChatFormatting.GRAY));
         }
         lines.add(Component.translatable("quality_api.tooltip.quality_stack.total", contents.total(), contents.capacity()).withStyle(ChatFormatting.DARK_GRAY));
+        lines.add(Component.translatable("quality_api.tooltip.quality_stack.hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 
     private static Component tierName(QualityStackContents contents, Optional<ResourceLocation> tier) {

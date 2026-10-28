@@ -39,6 +39,7 @@
   "quality_api.tooltip.broken": "Broken",
   "quality_api.tooltip.crafter": "Crafted by %s",
   "quality_api.tooltip.quality_stack.entry": "%s ×%s",
+  "quality_api.tooltip.quality_stack.hint": "Scroll to Select - Right Click to Remove",
   "quality_api.tooltip.quality_stack.plain": "Plain",
   "quality_api.tooltip.quality_stack.total": "%s / %s",
   "quality_api.tooltip.food.nutrition": "%s%% nourishment",

@@ -6,6 +6,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.item.ItemColors;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -15,26 +17,31 @@ import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ModelEvent;
+import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterItemDecorationsEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.model.BakedModelWrapper;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 
 @EventBusSubscriber(modid = QualityAPI.MOD_ID, value = Dist.CLIENT)
-public final class QualityStackRendering {
+public final class QualityStackClient {
     private static final ModelResourceLocation QUALITY_STACK_MODEL = ModelResourceLocation.inventory(QualityAPI.id("quality_stack"));
     private static final int NO_TINT = -1;
     private static final int COUNT_RIGHT_EDGE = 17;
@@ -51,7 +58,7 @@ public final class QualityStackRendering {
     private static final int BAR_BACKGROUND_HEIGHT = 2;
     private static final Supplier<BlockEntityWithoutLevelRenderer> HELD_ITEM_RENDERER = Suppliers.memoize(HeldItemRenderer::new);
 
-    private QualityStackRendering() {}
+    private QualityStackClient() {}
 
     @SubscribeEvent
     static void drawAsHeldItem(ModelEvent.ModifyBakingResult event) {
@@ -79,7 +86,24 @@ public final class QualityStackRendering {
 
     @SubscribeEvent
     static void drawCountAndTierBar(RegisterItemDecorationsEvent event) {
-        event.register(QualityAPI.QUALITY_STACK.get(), QualityStackRendering::drawCountAndTierBar);
+        event.register(QualityAPI.QUALITY_STACK.get(), QualityStackClient::drawCountAndTierBar);
+    }
+
+    @SubscribeEvent
+    static void showTierRowInTooltip(RegisterClientTooltipComponentFactoriesEvent event) {
+        event.register(QualityStackTooltip.class, TierRow::new);
+    }
+
+    @SubscribeEvent
+    static void scrollToChooseTier(ScreenEvent.MouseScrolled.Pre event) {
+        if (!(event.getScreen() instanceof AbstractContainerScreen<?> screen) || !screen.getMenu().getCarried().isEmpty()) return;
+        Slot hovered = screen.getSlotUnderMouse();
+        if (hovered == null || event.getScrollDeltaY() == 0) return;
+        int stepsTowardWorse = event.getScrollDeltaY() > 0 ? -1 : 1;
+        QualityStackContents.Entry chosen = QualityStacks.selectNeighbour(hovered.getItem(), stepsTowardWorse);
+        if (chosen == null) return;
+        PacketDistributor.sendToServer(new SelectQualityStackTierPayload(screen.getMenu().containerId, hovered.index, chosen.tier()));
+        event.setCanceled(true);
     }
 
     private static boolean drawCountAndTierBar(GuiGraphics graphics, Font font, ItemStack stack, int x, int y) {
@@ -110,6 +134,38 @@ public final class QualityStackRendering {
 
     private static int colorOf(Optional<ResourceLocation> tier) {
         return tier.flatMap(Qualities::get).map(quality -> quality.color().getValue()).orElse(PLAIN_COLOR);
+    }
+
+    private record TierRow(QualityStackTooltip tooltip) implements ClientTooltipComponent {
+        private static final int CELL_SIZE = 18;
+        private static final int ICON_INSET = 1;
+        private static final int UNDERLINE_HEIGHT = 1;
+        private static final int BOTTOM_MARGIN = 2;
+        private static final int CHOSEN_HIGHLIGHT_COLOR = 0x80FFFFFF;
+
+        @Override
+        public int getHeight() {
+            return CELL_SIZE + UNDERLINE_HEIGHT + BOTTOM_MARGIN;
+        }
+
+        @Override
+        public int getWidth(Font font) {
+            return CELL_SIZE * tooltip.tierStacksBestFirst().size();
+        }
+
+        @Override
+        public void renderImage(Font font, int x, int y, GuiGraphics graphics) {
+            List<ItemStack> tierStacks = tooltip.tierStacksBestFirst();
+            for (int index = 0; index < tierStacks.size(); index++) {
+                ItemStack tierStack = tierStacks.get(index);
+                int cellLeft = x + index * CELL_SIZE;
+                if (index == tooltip.nextOutIndex()) graphics.fill(cellLeft, y, cellLeft + CELL_SIZE, y + CELL_SIZE, CHOSEN_HIGHLIGHT_COLOR);
+                graphics.renderItem(tierStack, cellLeft + ICON_INSET, y + ICON_INSET);
+                graphics.renderItemDecorations(font, tierStack, cellLeft + ICON_INSET, y + ICON_INSET, String.valueOf(tierStack.getCount()));
+                int underlineTop = y + CELL_SIZE;
+                graphics.fill(cellLeft + ICON_INSET, underlineTop, cellLeft + CELL_SIZE - ICON_INSET, underlineTop + UNDERLINE_HEIGHT, OPAQUE | colorOf(Optional.ofNullable(tierStack.get(QualityAPI.QUALITY.get()))));
+            }
+        }
     }
 
     private static final class HeldItemModel extends BakedModelWrapper<BakedModel> {

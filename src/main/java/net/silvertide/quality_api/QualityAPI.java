@@ -41,6 +41,7 @@ import net.silvertide.quality_api.quality.Quality;
 import net.silvertide.quality_api.quality.QualityEffects;
 import net.silvertide.quality_api.stack.QualityStackContents;
 import net.silvertide.quality_api.stack.QualityStackItem;
+import net.silvertide.quality_api.stack.QualityStackSelection;
 import org.slf4j.Logger;
 
 import java.util.Map;
@@ -68,6 +69,10 @@ public class QualityAPI {
                     .persistent(QualityStackContents.CODEC)
                     .networkSynchronized(QualityStackContents.STREAM_CODEC)
                     .cacheEncoding());
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<QualityStackSelection>> QUALITY_STACK_SELECTION =
+            DATA_COMPONENTS.registerComponentType("quality_stack_selection", builder -> builder
+                    .networkSynchronized(QualityStackSelection.STREAM_CODEC));
 
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MOD_ID);
 
