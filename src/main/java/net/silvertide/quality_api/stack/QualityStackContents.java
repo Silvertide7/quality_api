@@ -24,7 +24,7 @@ import java.util.Optional;
 import java.util.TreeMap;
 
 public final class QualityStackContents {
-    public static final int CAPACITY_IN_STACKS = 4;
+    public static final int CAPACITY_IN_STACKS = 2;
 
     public record Entry(Optional<ResourceLocation> tier, int count) {
         private static final Codec<Entry> CODEC = RecordCodecBuilder.create(instance -> instance.group(

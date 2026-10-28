@@ -42,11 +42,18 @@ public final class QualityStacks {
         return moved;
     }
 
-    public static ItemStack extractBest(ItemStack qualityStack) {
+    public static ItemStack peekBest(ItemStack qualityStack) {
         QualityStackContents contents = contents(qualityStack);
         if (contents == null || contents.isEmpty()) return ItemStack.EMPTY;
         QualityStackContents.Entry best = contents.entriesBestFirst().getFirst();
-        int taken = Math.min(best.count(), contents.maxStackSize());
+        return contents.stackOf(best.tier(), Math.min(best.count(), contents.maxStackSize()));
+    }
+
+    public static ItemStack extractBest(ItemStack qualityStack, int maxCount) {
+        QualityStackContents contents = contents(qualityStack);
+        if (contents == null || contents.isEmpty() || maxCount <= 0) return ItemStack.EMPTY;
+        QualityStackContents.Entry best = contents.entriesBestFirst().getFirst();
+        int taken = Math.min(Math.min(best.count(), contents.maxStackSize()), maxCount);
         QualityStackContents remaining = contents.minus(best.tier(), taken);
         if (remaining.isEmpty()) qualityStack.setCount(0);
         else qualityStack.set(QualityAPI.QUALITY_STACK_CONTENTS.get(), remaining);
