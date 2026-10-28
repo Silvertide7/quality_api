@@ -95,13 +95,16 @@ public class QualityStackGameTests {
 
     @GameTest(template = EMPTY)
     public static void insertStopsAtCapacityAndLeavesTheRest(GameTestHelper helper) {
-        ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 64), carrots(SUPERIOR, 64));
-        helper.assertTrue(total(qualityStack) == CARROT_CAPACITY, "two full stacks should fill a quality stack");
+        ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 30), carrots(SUPERIOR, 34));
+        helper.assertTrue(total(qualityStack) == CARROT_CAPACITY, "one stack's worth across tiers should fill a quality stack");
+        ItemStack secondFullStack = carrots(SUPERIOR, 64);
+        helper.assertTrue(total(QualityStacks.poolIntoNewQualityStack(carrots(FINE, 64), secondFullStack)) == CARROT_CAPACITY && secondFullStack.getCount() == 64,
+                "two full stacks cannot both fit, so the second is left whole");
         ItemStack overflow = carrots(MASTERWORK, 10);
         helper.assertTrue(QualityStacks.insert(qualityStack, overflow) == 0 && overflow.getCount() == 10, "a full quality stack should take nothing and leave the stack whole");
         ItemStack potato = stack(Items.POTATO, FINE, 3);
         helper.assertTrue(QualityStacks.insert(QualityStacks.poolIntoNewQualityStack(carrots(FINE, 1), carrots(SUPERIOR, 1)), potato) == 0 && potato.getCount() == 3, "a carrot quality stack should refuse potatoes");
-        ItemStack nearlyFull = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 64), carrots(SUPERIOR, 60));
+        ItemStack nearlyFull = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 30), carrots(SUPERIOR, 30));
         ItemStack partial = carrots(MASTERWORK, 10);
         helper.assertTrue(QualityStacks.insert(nearlyFull, partial) == 4 && partial.getCount() == 6, "an almost full quality stack should take only what fits");
         helper.succeed();
@@ -110,12 +113,10 @@ public class QualityStackGameTests {
     @GameTest(template = EMPTY)
     public static void extractTakesTheBestTierFirstOneStackAtATime(GameTestHelper helper) {
         ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 5), carrots(null, 3));
-        QualityStacks.insert(qualityStack, carrots(MASTERWORK, 64));
-        QualityStacks.insert(qualityStack, carrots(MASTERWORK, 6));
+        QualityStacks.insert(qualityStack, carrots(MASTERWORK, 40));
         QualityStacks.insert(qualityStack, carrots(STANDARD, 4));
         QualityStacks.insert(qualityStack, carrots(REMOVED_TIER, 2));
-        assertExtracts(helper, qualityStack, MASTERWORK, 64);
-        assertExtracts(helper, qualityStack, MASTERWORK, 6);
+        assertExtracts(helper, qualityStack, MASTERWORK, 40);
         assertExtracts(helper, qualityStack, FINE, 5);
         assertExtracts(helper, qualityStack, STANDARD, 4);
         assertExtracts(helper, qualityStack, null, 3);
@@ -131,8 +132,6 @@ public class QualityStackGameTests {
         ItemStack collapsed = QualityStacks.collapseToSingleStack(oneTier).orElseThrow();
         helper.assertTrue(collapsed.is(Items.CARROT) && collapsed.getCount() == 40 && FINE.equals(collapsed.get(QualityAPI.QUALITY.get())), "one tier of 40 should collapse to 40 fine carrots");
         helper.assertTrue(oneTier.isEmpty(), "collapsing should use up the quality stack so the carrots exist only once");
-        ItemStack oneTierOverAStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 64), carrots(FINE, 6));
-        helper.assertTrue(QualityStacks.collapseToSingleStack(oneTierOverAStack).isEmpty() && total(oneTierOverAStack) == 70, "one tier of 70 should stay a quality stack");
         ItemStack twoTiers = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 1), carrots(SUPERIOR, 1));
         helper.assertTrue(QualityStacks.collapseToSingleStack(twoTiers).isEmpty() && total(twoTiers) == 2, "two tiers should stay a quality stack");
         ItemStack plainOnly = QualityStacks.collapseToSingleStack(QualityStacks.poolIntoNewQualityStack(carrots(null, 2), carrots(null, 3))).orElseThrow();
@@ -192,7 +191,7 @@ public class QualityStackGameTests {
 
     @GameTest(template = EMPTY)
     public static void aDestroyedQualityStackSpillsItsContents(GameTestHelper helper) {
-        ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 64), carrots(FINE, 26));
+        ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 30), carrots(FINE, 20));
         QualityStacks.insert(qualityStack, carrots(SUPERIOR, 10));
         Vec3 spot = helper.absoluteVec(new Vec3(1.5, 2.0, 1.5));
         ItemEntity dropped = new ItemEntity(helper.getLevel(), spot.x, spot.y, spot.z, qualityStack);
@@ -201,8 +200,8 @@ public class QualityStackGameTests {
         List<ItemEntity> spilled = helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(spot, spot).inflate(2.0), entity -> entity.isAlive() && entity.getItem().is(Items.CARROT));
         try {
             List<String> spilledStacks = spilled.stream().map(entity -> entity.getItem().getCount() + " " + entity.getItem().get(QualityAPI.QUALITY.get())).sorted().toList();
-            helper.assertTrue(!dropped.isAlive() && spilledStacks.equals(List.of("10 " + SUPERIOR, "26 " + FINE, "64 " + FINE)),
-                    "a destroyed quality stack should spill 64 + 26 fine and 10 superior carrots, spilled " + spilledStacks);
+            helper.assertTrue(!dropped.isAlive() && spilledStacks.equals(List.of("10 " + SUPERIOR, "50 " + FINE)),
+                    "a destroyed quality stack should spill 50 fine and 10 superior carrots, spilled " + spilledStacks);
         } finally {
             spilled.forEach(ItemEntity::discard);
         }
@@ -234,17 +233,17 @@ public class QualityStackGameTests {
     @GameTest(template = EMPTY)
     public static void rightClickingAQualityStackWithAnEmptyCursorTakesTheBestOut(GameTestHelper helper) {
         ServerPlayer player = clickingPlayer(helper);
-        ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 10), carrots(MASTERWORK, 64));
-        QualityStacks.insert(qualityStack, carrots(MASTERWORK, 6));
+        ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 10), carrots(MASTERWORK, 40));
+        QualityStacks.insert(qualityStack, carrots(SUPERIOR, 6));
         player.getInventory().setItem(FIRST_INVENTORY_SLOT, qualityStack);
         Map<String, Integer> before = carrotsByTier(player);
         rightClick(player, FIRST_INVENTORY_SLOT);
-        helper.assertTrue(isCarrots(player.inventoryMenu.getCarried(), MASTERWORK, 64), "the first click should take 64 masterwork carrots");
+        helper.assertTrue(isCarrots(player.inventoryMenu.getCarried(), MASTERWORK, 40), "the first click should take all 40 masterwork carrots");
         helper.assertTrue(carrotsByTier(player).equals(before), "taking out should keep every carrot, had " + before + " now " + carrotsByTier(player));
         player.getInventory().setItem(SECOND_INVENTORY_SLOT, player.inventoryMenu.getCarried());
         player.inventoryMenu.setCarried(ItemStack.EMPTY);
         rightClick(player, FIRST_INVENTORY_SLOT);
-        helper.assertTrue(isCarrots(player.inventoryMenu.getCarried(), MASTERWORK, 6), "the second click should take the last 6 masterwork carrots");
+        helper.assertTrue(isCarrots(player.inventoryMenu.getCarried(), SUPERIOR, 6), "the second click should take the 6 superior carrots");
         helper.assertTrue(isCarrots(player.getInventory().getItem(FIRST_INVENTORY_SLOT), FINE, 10), "a quality stack left with only 10 fine carrots should turn back into them");
         helper.assertTrue(carrotsByTier(player).equals(before), "collapsing should keep every carrot, had " + before + " now " + carrotsByTier(player));
         helper.succeed();
@@ -334,7 +333,7 @@ public class QualityStackGameTests {
         List<String> lines = qualityStack.getTooltipLines(Item.TooltipContext.EMPTY, null, TooltipFlag.NORMAL).stream().map(Component::getString).toList();
         String masterwork = Qualities.displayName(carrots(MASTERWORK, 1), MASTERWORK).getString();
         String fine = Qualities.displayName(carrots(FINE, 1), FINE).getString();
-        List<String> expected = List.of("Carrot", masterwork + " ×20", fine + " ×10", "Plain ×3", REMOVED_TIER + " ×2", "35 / 128", "Scroll to Select - Right Click to Remove");
+        List<String> expected = List.of("Carrot", masterwork + " ×20", fine + " ×10", "Plain ×3", REMOVED_TIER + " ×2", "35 / 64", "Scroll to Select - Right Click to Remove");
         helper.assertTrue(lines.equals(expected), "the tooltip should list tiers best first then the total, expected " + expected + " got " + lines);
         ItemStack goldenApples = QualityStacks.poolIntoNewQualityStack(stack(Items.ENCHANTED_GOLDEN_APPLE, FINE, 1), stack(Items.ENCHANTED_GOLDEN_APPLE, SUPERIOR, 1));
         helper.assertTrue(Objects.equals(goldenApples.getHoverName().getStyle().getColor(), new ItemStack(Items.ENCHANTED_GOLDEN_APPLE).getRarity().getStyleModifier().apply(Style.EMPTY).getColor()) && goldenApples.hasFoil(),
@@ -351,7 +350,7 @@ public class QualityStackGameTests {
         helper.assertTrue(!masterwork.isAlive() && total(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) == 40 && looseCarrots(player) == 0,
                 "20 picked-up masterwork carrots should all go into the quality stack");
         helper.assertTrue(masterwork.getItem().isEmpty(), "a used-up item entity should hold nothing, so a later pickup listener cannot hand its carrots out again");
-        player.getInventory().setItem(FIRST_INVENTORY_SLOT, QualityStacks.poolIntoNewQualityStack(carrots(FINE, 64), carrots(SUPERIOR, 62)));
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, QualityStacks.poolIntoNewQualityStack(carrots(FINE, 32), carrots(SUPERIOR, 30)));
         ItemEntity overflow = dropAt(helper, carrots(MASTERWORK, 10));
         overflow.playerTouch(player);
         helper.assertTrue(!overflow.isAlive() && total(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) == CARROT_CAPACITY && looseCarrots(player) == 8,
