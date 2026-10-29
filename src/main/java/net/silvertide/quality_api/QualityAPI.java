@@ -131,6 +131,7 @@ public class QualityAPI {
         MinQualityIngredient.register(modEventBus);
         AppleSkinCompat.registerIfLoaded();
         container.registerConfig(ModConfig.Type.COMMON, Config.COMMON_SPEC);
+        container.registerConfig(ModConfig.Type.SERVER, Config.SERVER_SPEC);
         container.registerConfig(ModConfig.Type.CLIENT, Config.CLIENT_SPEC);
         if (FMLEnvironment.dist.isClient()) {
             container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);

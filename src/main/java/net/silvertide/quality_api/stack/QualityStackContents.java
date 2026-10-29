@@ -14,6 +14,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ExtraCodecs;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.quality.Quality;
@@ -28,6 +29,8 @@ import java.util.TreeMap;
 
 public final class QualityStackContents {
     public static final int CAPACITY_IN_STACKS = 1;
+    private static final int LARGEST_CAPACITY_IN_STACKS_EVER_RELEASED = 4;
+    private static final int LOADABLE_TOTAL_LIMIT = Item.ABSOLUTE_MAX_STACK_SIZE * LARGEST_CAPACITY_IN_STACKS_EVER_RELEASED;
 
     public record Entry(Optional<ResourceLocation> tier, int count) {
         private static final Codec<Entry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -78,9 +81,9 @@ public final class QualityStackContents {
     }
 
     private static DataResult<QualityStackContents> validated(QualityStackContents contents) {
-        if (!isPoolable(contents.item)) return DataResult.error(() -> "Quality stack cannot hold " + contents.item);
+        if (contents.item.isEmpty() || contents.item.is(QualityAPI.QUALITY_STACK.get())) return DataResult.error(() -> "Quality stack cannot hold " + contents.item);
         if (contents.entries.isEmpty()) return DataResult.error(() -> "Quality stack has no entries");
-        if (contents.total > contents.capacity()) return DataResult.error(() -> "Quality stack holds " + contents.total + ", over its capacity of " + contents.capacity());
+        if (contents.total > LOADABLE_TOTAL_LIMIT) return DataResult.error(() -> "Quality stack holds " + contents.total + ", over the most any item could ever fit (" + LOADABLE_TOTAL_LIMIT + ")");
         return DataResult.success(contents);
     }
 
@@ -102,10 +105,6 @@ public final class QualityStackContents {
         long total = 0;
         for (Entry entry : entries) total += entry.count();
         return total;
-    }
-
-    public ItemStack item() {
-        return item.copy();
     }
 
     public Component hoverName() {

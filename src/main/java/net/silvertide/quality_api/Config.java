@@ -49,6 +49,15 @@ public final class Config {
 
     public static final ModConfigSpec COMMON_SPEC = COMMON.build();
 
+    private static final ModConfigSpec.Builder SERVER = new ModConfigSpec.Builder();
+
+    public static final ModConfigSpec.BooleanValue QUALITY_STACKS = SERVER
+            .comment("Right-clicking an item onto the same item of another quality makes a quality stack, and picked-up items go into quality stacks you carry.",
+                    "Off stops both; quality stacks that already exist can still be emptied and filled by hand, so nothing is trapped.")
+            .define("qualityStacks", true);
+
+    public static final ModConfigSpec SERVER_SPEC = SERVER.build();
+
     private static final ModConfigSpec.Builder CLIENT = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.BooleanValue SHOW_QUALITY_TOOLTIP = CLIENT

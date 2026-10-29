@@ -33,6 +33,7 @@ import net.neoforged.neoforge.common.CommonHooks;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
 import net.silvertide.quality_api.stack.QualityStackContents;
@@ -129,12 +130,12 @@ public class QualityStackGameTests {
     @GameTest(template = EMPTY)
     public static void aSingleTierThatFitsOneStackCollapsesBack(GameTestHelper helper) {
         ItemStack oneTier = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 30), carrots(FINE, 10));
-        ItemStack collapsed = QualityStacks.collapseToSingleStack(oneTier).orElseThrow();
+        ItemStack collapsed = QualityStacks.collapseToSingleStack(oneTier, Integer.MAX_VALUE).orElseThrow();
         helper.assertTrue(collapsed.is(Items.CARROT) && collapsed.getCount() == 40 && FINE.equals(collapsed.get(QualityAPI.QUALITY.get())), "one tier of 40 should collapse to 40 fine carrots");
         helper.assertTrue(oneTier.isEmpty(), "collapsing should use up the quality stack so the carrots exist only once");
         ItemStack twoTiers = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 1), carrots(SUPERIOR, 1));
-        helper.assertTrue(QualityStacks.collapseToSingleStack(twoTiers).isEmpty() && total(twoTiers) == 2, "two tiers should stay a quality stack");
-        ItemStack plainOnly = QualityStacks.collapseToSingleStack(QualityStacks.poolIntoNewQualityStack(carrots(null, 2), carrots(null, 3))).orElseThrow();
+        helper.assertTrue(QualityStacks.collapseToSingleStack(twoTiers, Integer.MAX_VALUE).isEmpty() && total(twoTiers) == 2, "two tiers should stay a quality stack");
+        ItemStack plainOnly = QualityStacks.collapseToSingleStack(QualityStacks.poolIntoNewQualityStack(carrots(null, 2), carrots(null, 3)), Integer.MAX_VALUE).orElseThrow();
         helper.assertTrue(plainOnly.is(Items.CARROT) && plainOnly.getCount() == 5 && !plainOnly.has(QualityAPI.QUALITY.get()), "plain carrots should collapse to plain carrots");
         helper.succeed();
     }
@@ -143,12 +144,18 @@ public class QualityStackGameTests {
     public static void invalidContentsAreRejectedWhenLoadedOrReceived(GameTestHelper helper) {
         RegistryAccess registries = helper.getLevel().registryAccess();
         assertRejected(helper, "{item:{id:\"minecraft:carrot\"},entries:[{tier:\"quality_api:fine\",count:2147483647},{tier:\"quality_api:fine\",count:1}]}", "overflowing counts");
-        assertRejected(helper, "{item:{id:\"minecraft:carrot\"},entries:[{tier:\"quality_api:fine\",count:300}]}", "more than the capacity");
+        assertRejected(helper, "{item:{id:\"minecraft:carrot\"},entries:[{tier:\"quality_api:fine\",count:400}]}", "more than any item could ever fit");
         assertRejected(helper, "{item:{id:\"minecraft:carrot\"},entries:[]}", "no entries");
-        assertRejected(helper, "{item:{id:\"minecraft:iron_sword\"},entries:[{count:1}]}", "a damageable item");
         assertRejected(helper, "{item:{id:\"quality_api:quality_stack\"},entries:[{count:1}]}", "a quality stack inside a quality stack");
         QualityStackContents withQualityOnTheItem = parse(helper, "{item:{id:\"minecraft:carrot\",components:{\"quality_api:quality\":\"quality_api:fine\"}},entries:[{tier:\"quality_api:superior\",count:3}]}").getOrThrow();
-        helper.assertTrue(!withQualityOnTheItem.item().has(QualityAPI.QUALITY.get()), "a quality on the stored item should be stripped when loaded");
+        helper.assertTrue(withQualityOnTheItem.equals(parse(helper, "{item:{id:\"minecraft:carrot\"},entries:[{tier:\"quality_api:superior\",count:3}]}").getOrThrow()),
+                "a quality on the stored item should be stripped when loaded");
+        QualityStackContents swordsSavedBeforeTheyBecameDamageable = parse(helper, "{item:{id:\"minecraft:iron_sword\"},entries:[{count:3}]}").getOrThrow();
+        helper.assertTrue(swordsSavedBeforeTheyBecameDamageable.total() == 3 && !swordsSavedBeforeTheyBecameDamageable.accepts(new ItemStack(Items.IRON_SWORD)),
+                "contents whose item can no longer pool should still load, so nothing is lost, but take nothing more in");
+        QualityStackContents overTodaysCapacity = parse(helper, "{item:{id:\"minecraft:carrot\"},entries:[{tier:\"quality_api:fine\",count:90}]}").getOrThrow();
+        helper.assertTrue(overTodaysCapacity.total() == 90, "contents over the item's current capacity should still load if the item's stack size shrank");
+        helper.assertTrue(parse(helper, "{item:{id:\"minecraft:carrot\"},entries:[{tier:\"quality_api:fine\",count:256}]}").isSuccess(), "a full quality stack from the release that held four stacks should still load");
         RegistryFriendlyByteBuf overCapacity = new RegistryFriendlyByteBuf(Unpooled.buffer(), registries);
         ItemStack.STREAM_CODEC.encode(overCapacity, new ItemStack(Items.CARROT));
         overCapacity.writeVarInt(1);
@@ -161,7 +168,7 @@ public class QualityStackGameTests {
         } catch (DecoderException expected) {
             rejected = true;
         }
-        helper.assertTrue(rejected, "a received quality stack over capacity should be rejected");
+        helper.assertTrue(rejected, "a received quality stack over what any item could fit should be rejected");
         helper.succeed();
     }
 
@@ -319,9 +326,31 @@ public class QualityStackGameTests {
         singleItemContainer.setItem(0, QualityStacks.poolIntoNewQualityStack(carrots(FINE, 1), carrots(SUPERIOR, 1)));
         helper.assertFalse(rightClickWithEvent(player, singleItemSlot, cursor), "a slot that holds one carrot should not let its quality stack grow");
 
-        copyingContainer.setItem(0, new ItemStack(QualityAPI.QUALITY_STACK.get()));
+        singleItemContainer.setItem(0, QualityStacks.poolIntoNewQualityStack(carrots(FINE, 10), carrots(MASTERWORK, 20)));
         cursor.setItem(0, ItemStack.EMPTY);
+        rightClickWithEvent(player, singleItemSlot, cursor);
+        helper.assertTrue(isCarrots(cursor.getItem(0), MASTERWORK, 20) && total(singleItemContainer.getItem(0)) == 10,
+                "a slot that holds one carrot should keep the last 10 as a quality stack rather than lose 9 by turning them back into carrots");
+
+        ItemStack overCapacity = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 1), carrots(SUPERIOR, 1));
+        overCapacity.set(QualityAPI.QUALITY_STACK_CONTENTS.get(), parse(helper, "{item:{id:\"minecraft:carrot\"},entries:[{tier:\"quality_api:fine\",count:90}]}").getOrThrow());
+        copyingContainer.setItem(0, carrots(SUPERIOR, 10));
+        cursor.setItem(0, overCapacity);
+        rightClickWithEvent(player, copyingSlot, cursor);
+        helper.assertTrue(isCarrots(copyingContainer.getItem(0), SUPERIOR, 10) && total(cursor.getItem(0)) == 90, "a quality stack over capacity should take nothing in and leave the slot as it was");
+        cursor.setItem(0, new ItemStack(QualityAPI.QUALITY_STACK.get()));
+        copyingContainer.setItem(0, ItemStack.EMPTY);
+        helper.assertFalse(rightClickWithEvent(player, copyingSlot, cursor), "a carried quality stack with no contents should fall through to vanilla's place-one");
+        cursor.setItem(0, ItemStack.EMPTY);
+
+        copyingContainer.setItem(0, new ItemStack(QualityAPI.QUALITY_STACK.get()));
         helper.assertFalse(rightClickWithEvent(player, copyingSlot, cursor), "a quality stack with no contents should fall through to vanilla");
+        ItemStack multipliedQualityStack = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 1), carrots(SUPERIOR, 1));
+        multipliedQualityStack.set(DataComponents.MAX_STACK_SIZE, 64);
+        multipliedQualityStack.setCount(64);
+        ItemStack oneMore = carrots(FINE, 1);
+        helper.assertTrue(QualityStacks.contents(multipliedQualityStack) == null && QualityStacks.insert(multipliedQualityStack, oneMore) == 0 && oneMore.getCount() == 1,
+                "a quality stack forced to stack above one should be inert, so its shared contents cannot be multiplied");
         helper.succeed();
     }
 
@@ -404,6 +433,30 @@ public class QualityStackGameTests {
         rightClick(player, FIRST_INVENTORY_SLOT);
         helper.assertTrue(isCarrots(player.inventoryMenu.getCarried(), FINE, 10) && isCarrots(player.getInventory().getItem(FIRST_INVENTORY_SLOT), MASTERWORK, 20),
                 "right-clicking should take out the chosen tier, then the last tier left should turn back into normal carrots");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void turningQualityStacksOffStopsMakingThemButNeverTrapsItems(GameTestHelper helper) {
+        boolean configuredQualityStacks = Config.QUALITY_STACKS.get();
+        Config.QUALITY_STACKS.set(false);
+        try {
+            ServerPlayer player = clickingPlayer(helper);
+            player.getInventory().setItem(FIRST_INVENTORY_SLOT, carrots(FINE, 10));
+            player.inventoryMenu.setCarried(carrots(SUPERIOR, 20));
+            rightClick(player, FIRST_INVENTORY_SLOT);
+            helper.assertFalse(QualityStacks.isQualityStack(player.getInventory().getItem(FIRST_INVENTORY_SLOT)), "with quality stacks off, right-clicking should not make one");
+            player.getInventory().clearContent();
+            player.inventoryMenu.setCarried(ItemStack.EMPTY);
+            player.getInventory().setItem(FIRST_INVENTORY_SLOT, QualityStacks.poolIntoNewQualityStack(carrots(FINE, 10), carrots(SUPERIOR, 10)));
+            ItemEntity dropped = dropAt(helper, carrots(MASTERWORK, 5));
+            dropped.playerTouch(player);
+            helper.assertTrue(total(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) == 20 && looseCarrots(player) == 5, "with quality stacks off, pickups should go to normal slots");
+            rightClick(player, FIRST_INVENTORY_SLOT);
+            helper.assertTrue(isCarrots(player.inventoryMenu.getCarried(), SUPERIOR, 10), "with quality stacks off, an existing one should still give its items back");
+        } finally {
+            Config.QUALITY_STACKS.set(configuredQualityStacks);
+        }
         helper.succeed();
     }
 

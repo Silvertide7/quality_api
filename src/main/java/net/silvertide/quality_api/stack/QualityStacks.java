@@ -17,7 +17,7 @@ public final class QualityStacks {
 
     @Nullable
     public static QualityStackContents contents(ItemStack stack) {
-        return isQualityStack(stack) ? stack.get(QualityAPI.QUALITY_STACK_CONTENTS.get()) : null;
+        return isQualityStack(stack) && stack.getCount() == 1 ? stack.get(QualityAPI.QUALITY_STACK_CONTENTS.get()) : null;
     }
 
     public static boolean canPool(ItemStack first, ItemStack second) {
@@ -67,7 +67,7 @@ public final class QualityStacks {
     public static QualityStackContents.Entry selectNeighbour(ItemStack qualityStack, int stepsTowardWorse) {
         QualityStackContents contents = contents(qualityStack);
         QualityStackContents.Entry current = nextOut(qualityStack);
-        if (contents == null || current == null) return null;
+        if (contents == null || current == null || contents.entries().size() < 2) return null;
         List<QualityStackContents.Entry> entriesBestFirst = contents.entriesBestFirst();
         int neighbourIndex = Math.floorMod(entriesBestFirst.indexOf(current) + stepsTowardWorse, entriesBestFirst.size());
         QualityStackContents.Entry neighbour = entriesBestFirst.get(neighbourIndex);
@@ -94,16 +94,16 @@ public final class QualityStacks {
         return contents.stackOf(next.tier(), taken);
     }
 
-    public static Optional<ItemStack> collapseToSingleStack(ItemStack qualityStack) {
+    public static Optional<ItemStack> collapseToSingleStack(ItemStack qualityStack, int maxCount) {
         QualityStackContents contents = contents(qualityStack);
         if (contents == null || contents.entries().size() != 1) return Optional.empty();
         QualityStackContents.Entry only = contents.entries().getFirst();
-        if (only.count() > contents.maxStackSize()) return Optional.empty();
+        if (only.count() > Math.min(contents.maxStackSize(), maxCount)) return Optional.empty();
         qualityStack.setCount(0);
         return Optional.of(contents.stackOf(only.tier(), only.count()));
     }
 
-    private static Optional<ResourceLocation> tierOf(ItemStack stack) {
+    static Optional<ResourceLocation> tierOf(ItemStack stack) {
         return Optional.ofNullable(stack.get(QualityAPI.QUALITY.get()));
     }
 }

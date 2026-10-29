@@ -10,6 +10,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.ItemStackedOnOtherEvent;
+import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 
 @EventBusSubscriber(modid = QualityAPI.MOD_ID)
@@ -33,16 +34,19 @@ public final class QualityStackClicks {
         ItemStack inSlot = slot.getItem();
         if (inSlot.isEmpty()) {
             ItemStack next = QualityStacks.peekNext(qualityStack);
+            if (next.isEmpty()) return false;
             int fits = slot.mayPlace(next) ? Math.min(next.getCount(), slot.getMaxStackSize(next)) : 0;
             if (fits <= 0) return true;
             slot.setByPlayer(QualityStacks.extractNext(qualityStack, fits));
-            QualityStacks.collapseToSingleStack(qualityStack).ifPresent(carriedAccess::set);
+            QualityStacks.collapseToSingleStack(qualityStack, Integer.MAX_VALUE).ifPresent(carriedAccess::set);
             playSound(player, SoundEvents.BUNDLE_REMOVE_ONE);
             return true;
         }
         QualityStackContents contents = QualityStacks.contents(qualityStack);
         if (contents == null || !contents.accepts(inSlot)) return false;
-        ItemStack taken = slot.safeTake(inSlot.getCount(), contents.capacity() - contents.total(), player);
+        int room = contents.capacity() - contents.total();
+        if (room <= 0) return true;
+        ItemStack taken = slot.safeTake(inSlot.getCount(), room, player);
         if (taken.isEmpty()) return true;
         QualityStacks.insert(qualityStack, taken);
         if (!taken.isEmpty()) player.getInventory().placeItemBackInInventory(taken);
@@ -54,8 +58,9 @@ public final class QualityStackClicks {
         QualityStackContents contents = QualityStacks.contents(qualityStack);
         if (contents == null || !slot.allowModification(player)) return false;
         if (carried.isEmpty()) {
-            carriedAccess.set(QualityStacks.extractNext(qualityStack, Integer.MAX_VALUE));
+            ItemStack taken = QualityStacks.extractNext(qualityStack, Integer.MAX_VALUE);
             writeBack(slot, qualityStack);
+            carriedAccess.set(taken);
             playSound(player, SoundEvents.BUNDLE_REMOVE_ONE);
             return true;
         }
@@ -69,7 +74,8 @@ public final class QualityStackClicks {
 
     private static void writeBack(Slot slot, ItemStack qualityStack) {
         ItemStack remaining = qualityStack.isEmpty() ? ItemStack.EMPTY : qualityStack;
-        slot.set(QualityStacks.collapseToSingleStack(qualityStack).orElse(remaining));
+        int collapseLimit = slot.mayPlace(QualityStacks.peekNext(qualityStack)) ? slot.getMaxStackSize() : 0;
+        slot.set(QualityStacks.collapseToSingleStack(qualityStack, collapseLimit).orElse(remaining));
     }
 
     private static boolean slotHoldsLessThanAFullStackOf(Slot slot, ItemStack stack) {
@@ -78,7 +84,7 @@ public final class QualityStackClicks {
 
     private static boolean carriedPoolsWithSlot(ItemStack carried, Slot slot, Player player, SlotAccess carriedAccess) {
         ItemStack inSlot = slot.getItem();
-        if (ItemStack.isSameItemSameComponents(carried, inSlot) || !QualityStacks.canPool(inSlot, carried) || !slot.allowModification(player) || slotHoldsLessThanAFullStackOf(slot, inSlot)) return false;
+        if (!Config.QUALITY_STACKS.get() || ItemStack.isSameItemSameComponents(carried, inSlot) || !QualityStacks.canPool(inSlot, carried) || !slot.allowModification(player) || slotHoldsLessThanAFullStackOf(slot, inSlot)) return false;
         ItemStack slotRemainder = inSlot.copy();
         ItemStack carriedRemainder = carried.copy();
         ItemStack qualityStack = QualityStacks.poolIntoNewQualityStack(slotRemainder, carriedRemainder);

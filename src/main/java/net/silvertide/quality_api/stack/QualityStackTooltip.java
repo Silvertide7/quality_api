@@ -5,4 +5,4 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 
-public record QualityStackTooltip(List<ItemStack> tierStacksBestFirst, int nextOutIndex) implements TooltipComponent {}
+record QualityStackTooltip(List<ItemStack> tierStacksBestFirst, int nextOutIndex) implements TooltipComponent {}

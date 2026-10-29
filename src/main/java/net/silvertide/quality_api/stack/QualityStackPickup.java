@@ -12,6 +12,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
+import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 
 import java.util.UUID;
@@ -27,7 +28,7 @@ public final class QualityStackPickup {
         Player player = event.getPlayer();
         ItemEntity itemEntity = event.getItemEntity();
         ItemStack picked = itemEntity.getItem();
-        if (!QualityStackContents.isPoolable(picked) || !mayPickUp(event, player, itemEntity)) return;
+        if (!Config.QUALITY_STACKS.get() || !QualityStackContents.isPoolable(picked) || !mayPickUp(event, player, itemEntity)) return;
         ItemStack beforePickup = picked.copy();
         int moved = insertIntoQualityStacks(player.getInventory(), picked);
         if (moved == 0) return;

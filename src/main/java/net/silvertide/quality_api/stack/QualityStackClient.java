@@ -7,6 +7,7 @@ import net.minecraft.client.color.item.ItemColors;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
@@ -17,6 +18,7 @@ import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
@@ -57,6 +59,7 @@ public final class QualityStackClient {
     private static final int BAR_HEIGHT = 1;
     private static final int BAR_BACKGROUND_HEIGHT = 2;
     private static final Supplier<BlockEntityWithoutLevelRenderer> HELD_ITEM_RENDERER = Suppliers.memoize(HeldItemRenderer::new);
+    private static double unusedScroll;
 
     private QualityStackClient() {}
 
@@ -95,15 +98,20 @@ public final class QualityStackClient {
     }
 
     @SubscribeEvent
-    static void scrollToChooseTier(ScreenEvent.MouseScrolled.Pre event) {
+    static void scrollToSelectTier(ScreenEvent.MouseScrolled.Pre event) {
         if (!(event.getScreen() instanceof AbstractContainerScreen<?> screen) || !screen.getMenu().getCarried().isEmpty()) return;
+        Player player = Minecraft.getInstance().player;
         Slot hovered = screen.getSlotUnderMouse();
-        if (hovered == null || event.getScrollDeltaY() == 0) return;
-        int stepsTowardWorse = event.getScrollDeltaY() > 0 ? -1 : 1;
-        QualityStackContents.Entry chosen = QualityStacks.selectNeighbour(hovered.getItem(), stepsTowardWorse);
-        if (chosen == null) return;
-        PacketDistributor.sendToServer(new SelectQualityStackTierPayload(screen.getMenu().containerId, hovered.index, chosen.tier()));
+        if (player == null || player.isSpectator() || hovered == null || !hovered.allowModification(player)) return;
+        if (QualityStacks.contents(hovered.getItem()) == null) return;
         event.setCanceled(true);
+        unusedScroll += event.getScrollDeltaY();
+        int wholeNotches = (int) unusedScroll;
+        if (wholeNotches == 0) return;
+        unusedScroll -= wholeNotches;
+        QualityStackContents.Entry selected = QualityStacks.selectNeighbour(hovered.getItem(), -Integer.signum(wholeNotches));
+        if (selected == null || screen instanceof CreativeModeInventoryScreen) return;
+        PacketDistributor.sendToServer(new SelectQualityStackTierPayload(screen.getMenu().containerId, hovered.index, new QualityStackSelection(selected.tier())));
     }
 
     private static boolean drawCountAndTierBar(GuiGraphics graphics, Font font, ItemStack stack, int x, int y) {
@@ -141,7 +149,7 @@ public final class QualityStackClient {
         private static final int ICON_INSET = 1;
         private static final int UNDERLINE_HEIGHT = 1;
         private static final int BOTTOM_MARGIN = 2;
-        private static final int CHOSEN_HIGHLIGHT_COLOR = 0x80FFFFFF;
+        private static final int NEXT_OUT_HIGHLIGHT_COLOR = 0x80FFFFFF;
 
         @Override
         public int getHeight() {
@@ -159,11 +167,11 @@ public final class QualityStackClient {
             for (int index = 0; index < tierStacks.size(); index++) {
                 ItemStack tierStack = tierStacks.get(index);
                 int cellLeft = x + index * CELL_SIZE;
-                if (index == tooltip.nextOutIndex()) graphics.fill(cellLeft, y, cellLeft + CELL_SIZE, y + CELL_SIZE, CHOSEN_HIGHLIGHT_COLOR);
+                if (index == tooltip.nextOutIndex()) graphics.fill(cellLeft, y, cellLeft + CELL_SIZE, y + CELL_SIZE, NEXT_OUT_HIGHLIGHT_COLOR);
                 graphics.renderItem(tierStack, cellLeft + ICON_INSET, y + ICON_INSET);
                 graphics.renderItemDecorations(font, tierStack, cellLeft + ICON_INSET, y + ICON_INSET, String.valueOf(tierStack.getCount()));
                 int underlineTop = y + CELL_SIZE;
-                graphics.fill(cellLeft + ICON_INSET, underlineTop, cellLeft + CELL_SIZE - ICON_INSET, underlineTop + UNDERLINE_HEIGHT, OPAQUE | colorOf(Optional.ofNullable(tierStack.get(QualityAPI.QUALITY.get()))));
+                graphics.fill(cellLeft + ICON_INSET, underlineTop, cellLeft + CELL_SIZE - ICON_INSET, underlineTop + UNDERLINE_HEIGHT, OPAQUE | colorOf(QualityStacks.tierOf(tierStack)));
             }
         }
     }

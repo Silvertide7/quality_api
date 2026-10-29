@@ -4,7 +4,6 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
@@ -15,10 +14,8 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.silvertide.quality_api.QualityAPI;
 
-import java.util.Optional;
-
 @EventBusSubscriber(modid = QualityAPI.MOD_ID)
-public record SelectQualityStackTierPayload(int containerId, int slotIndex, Optional<ResourceLocation> tier) implements CustomPacketPayload {
+public record SelectQualityStackTierPayload(int containerId, int slotIndex, QualityStackSelection selection) implements CustomPacketPayload {
     public static final Type<SelectQualityStackTierPayload> TYPE = new Type<>(QualityAPI.id("select_quality_stack_tier"));
 
     private static final String PROTOCOL_VERSION = "1";
@@ -26,7 +23,7 @@ public record SelectQualityStackTierPayload(int containerId, int slotIndex, Opti
     private static final StreamCodec<RegistryFriendlyByteBuf, SelectQualityStackTierPayload> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_INT, SelectQualityStackTierPayload::containerId,
             ByteBufCodecs.VAR_INT, SelectQualityStackTierPayload::slotIndex,
-            ByteBufCodecs.optional(ResourceLocation.STREAM_CODEC), SelectQualityStackTierPayload::tier,
+            QualityStackSelection.STREAM_CODEC, SelectQualityStackTierPayload::selection,
             SelectQualityStackTierPayload::new);
 
     @Override
@@ -42,10 +39,11 @@ public record SelectQualityStackTierPayload(int containerId, int slotIndex, Opti
     private static void handle(SelectQualityStackTierPayload payload, IPayloadContext context) {
         Player player = context.player();
         AbstractContainerMenu menu = player.containerMenu;
-        if (menu.containerId != payload.containerId() || payload.slotIndex() < 0 || payload.slotIndex() >= menu.slots.size()) return;
+        if (player.isSpectator() || menu.containerId != payload.containerId() || !menu.stillValid(player)) return;
+        if (payload.slotIndex() < 0 || payload.slotIndex() >= menu.slots.size()) return;
         Slot slot = menu.getSlot(payload.slotIndex());
         ItemStack qualityStack = slot.getItem();
-        if (!slot.allowModification(player) || !QualityStacks.select(qualityStack, payload.tier())) return;
+        if (!slot.allowModification(player) || !QualityStacks.select(qualityStack, payload.selection().tier())) return;
         slot.set(qualityStack);
     }
 }
