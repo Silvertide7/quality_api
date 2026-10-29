@@ -72,7 +72,16 @@ public final class QualityStacks {
         intoQualityStack.set(QualityAPI.QUALITY_STACK_CONTENTS.get(), target);
         if (source.isEmpty()) fromQualityStack.setCount(0);
         else fromQualityStack.set(QualityAPI.QUALITY_STACK_CONTENTS.get(), source);
+        clearSelectionIfNoLongerHeld(fromQualityStack);
         return moved;
+    }
+
+    private static void clearSelectionIfNoLongerHeld(ItemStack qualityStack) {
+        QualityStackContents contents = contents(qualityStack);
+        QualityStackSelection selection = qualityStack.get(QualityAPI.QUALITY_STACK_SELECTION.get());
+        if (contents != null && selection != null && contents.entries().stream().noneMatch(entry -> entry.tier().equals(selection.tier()))) {
+            qualityStack.remove(QualityAPI.QUALITY_STACK_SELECTION.get());
+        }
     }
 
     @Nullable

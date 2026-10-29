@@ -41,14 +41,15 @@ public final class QualityStackPickup {
             event.setCanPickup(TriState.FALSE);
         }
         player.awardStat(Stats.ITEM_PICKED_UP.get(beforePickup.getItem()), moved);
-        if (usedUp) triggerPickupCriteriaWithPickedCount(player, itemEntity, moved);
-        else player.onItemPickup(itemEntity);
+        triggerPickupCriteriaWithPickedCount(player, itemEntity, moved);
     }
 
     private static void triggerPickupCriteriaWithPickedCount(Player player, ItemEntity itemEntity, int pickedCount) {
-        itemEntity.getItem().setCount(pickedCount);
+        ItemStack left = itemEntity.getItem();
+        int leftCount = left.getCount();
+        left.setCount(pickedCount);
         player.onItemPickup(itemEntity);
-        itemEntity.getItem().setCount(0);
+        left.setCount(leftCount);
     }
 
     private static boolean mayPickUp(ItemEntityPickupEvent.Pre event, Player player, ItemEntity itemEntity) {

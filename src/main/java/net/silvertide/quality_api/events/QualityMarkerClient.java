@@ -37,7 +37,7 @@ public final class QualityMarkerClient {
         ResourceLocation tier = stack.get(QualityAPI.QUALITY.get());
         if (tier == null || !Config.SHOW_QUALITY_MARKER.get()) return false;
         Quality quality = Snapshot.current().tiers().get(tier);
-        if (quality == null || Config.HIDDEN_TOOLTIP_TIERS.get().contains(tier.toString())) return false;
+        if (quality == null || Config.isTierHidden(tier)) return false;
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, OVERLAY_LAYER);
         drawMarker(graphics, x + MARKER_LEFT, y + MARKER_TOP, quality.color().getValue());

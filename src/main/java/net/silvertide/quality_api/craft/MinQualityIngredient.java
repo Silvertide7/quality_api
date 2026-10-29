@@ -17,7 +17,6 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
-import net.silvertide.quality_api.quality.Quality;
 
 import java.util.stream.Stream;
 
@@ -47,7 +46,7 @@ public record MinQualityIngredient(HolderSet<Item> items, int minLevel) implemen
         return items.stream().map(holder -> {
             ItemStack stack = new ItemStack(holder);
             for (ResourceLocation id : Qualities.idsByLevel()) {
-                if (Qualities.get(id).map(Quality::level).orElse(0) >= minLevel && Qualities.apply(stack, id)) break;
+                if (Qualities.levelOf(id) >= minLevel && Qualities.apply(stack, id)) break;
             }
             return stack;
         });

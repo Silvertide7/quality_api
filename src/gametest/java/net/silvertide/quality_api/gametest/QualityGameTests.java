@@ -795,7 +795,7 @@ public class QualityGameTests {
     @GameTest(template = EMPTY)
     public static void qualityFoodRestoresScaledNutritionAndPostsEvent(GameTestHelper helper) {
         QualityEffects patch = foodPatch(Optional.of(1.4F), Optional.of(0.5F), Optional.empty(), Optional.empty());
-        withFoodOverride(Items.COOKED_BEEF, MASTERWORK, patch, () -> {
+        withItemOverride(Items.COOKED_BEEF, MASTERWORK, patch, () -> {
             ServerPlayer player = mockServerPlayer(helper);
             player.getFoodData().setFoodLevel(0);
             player.getFoodData().setSaturation(0.0F);
@@ -821,7 +821,7 @@ public class QualityGameTests {
     public static void qualityFoodAppliesExtraEatEffects(GameTestHelper helper) {
         QualityEffects.EatEffect absorption = new QualityEffects.EatEffect(MobEffects.ABSORPTION, 1200, 1, 1.0F);
         QualityEffects patch = foodPatch(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of(absorption)));
-        withFoodOverride(Items.COOKED_BEEF, MASTERWORK, patch, () -> {
+        withItemOverride(Items.COOKED_BEEF, MASTERWORK, patch, () -> {
             ServerPlayer player = mockServerPlayer(helper);
             eat(helper, player, withQuality(Items.COOKED_BEEF, MASTERWORK));
             MobEffectInstance applied = player.getEffect(MobEffects.ABSORPTION);
@@ -833,7 +833,7 @@ public class QualityGameTests {
     @GameTest(template = EMPTY)
     public static void qualityFoodScalesExistingEffectDurations(GameTestHelper helper) {
         QualityEffects patch = foodPatch(Optional.empty(), Optional.empty(), Optional.of(2.0F), Optional.empty());
-        withFoodOverride(Items.GOLDEN_APPLE, MASTERWORK, patch, () -> {
+        withItemOverride(Items.GOLDEN_APPLE, MASTERWORK, patch, () -> {
             ServerPlayer player = mockServerPlayer(helper);
             eat(helper, player, withQuality(Items.GOLDEN_APPLE, MASTERWORK));
             MobEffectInstance regeneration = player.getEffect(MobEffects.REGENERATION);
@@ -854,12 +854,38 @@ public class QualityGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = EMPTY)
+    public static void armourPiecesOfOneTierGetTheirOwnModifierIdsForAMultiSlotGroup(GameTestHelper helper) {
+        QualityEffects armourBonus = new QualityEffects(
+                Optional.of(List.of(new QualityEffects.AttributeEffect(Attributes.ARMOR, AttributeModifier.Operation.ADD_VALUE, 1.0, Optional.of(EquipmentSlotGroup.ARMOR)))),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+        withItemOverride(Items.IRON_HELMET, SUPERIOR, armourBonus, () -> withItemOverride(Items.IRON_BOOTS, SUPERIOR, armourBonus, () -> {
+            ItemStack helmet = new ItemStack(Items.IRON_HELMET);
+            ItemStack boots = new ItemStack(Items.IRON_BOOTS);
+            Qualities.apply(helmet, SUPERIOR);
+            Qualities.apply(boots, SUPERIOR);
+            ResourceLocation helmetBonusId = qualityArmourModifierId(helmet);
+            ResourceLocation bootsBonusId = qualityArmourModifierId(boots);
+            helper.assertTrue(helmetBonusId != null && bootsBonusId != null && !helmetBonusId.equals(bootsBonusId),
+                    "two armour pieces sharing an armor-group bonus need distinct ids, got " + helmetBonusId + " and " + bootsBonusId);
+        }));
+        helper.succeed();
+    }
+
+    @Nullable
+    private static ResourceLocation qualityArmourModifierId(ItemStack stack) {
+        for (ItemAttributeModifiers.Entry entry : stack.getAttributeModifiers().modifiers()) {
+            if (entry.attribute().equals(Attributes.ARMOR) && entry.modifier().id().getNamespace().equals(QualityAPI.MOD_ID) && entry.slot() == EquipmentSlotGroup.ARMOR) return entry.modifier().id();
+        }
+        return null;
+    }
+
     private static QualityEffects foodPatch(Optional<Float> nutritionMultiplier, Optional<Float> saturationMultiplier, Optional<Float> eatEffectDurationMultiplier, Optional<List<QualityEffects.EatEffect>> eatEffects) {
         return new QualityEffects(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 nutritionMultiplier, saturationMultiplier, eatEffectDurationMultiplier, eatEffects);
     }
 
-    private static void withFoodOverride(Item item, ResourceLocation tier, QualityEffects patch, Runnable body) {
+    private static void withItemOverride(Item item, ResourceLocation tier, QualityEffects patch, Runnable body) {
         Snapshot loaded = Snapshot.current();
         Map<Item, Map<ResourceLocation, Snapshot.Resolved>> overrides = new HashMap<>(loaded.overrides());
         overrides.put(item, Map.of(tier, Snapshot.Resolved.of(tier, loaded.tiers().get(tier).effects().patchedWith(patch))));

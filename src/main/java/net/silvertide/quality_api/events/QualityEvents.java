@@ -6,6 +6,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -84,16 +85,18 @@ public final class QualityEvents {
         ItemStack stack = event.getItemStack();
         Snapshot.Resolved resolved = resolvedFor(stack);
         if (resolved == null || resolved.attributes().length == 0) return;
-        EquipmentSlotGroup fallbackSlot = equipmentSlotOf(stack);
+        EquipmentSlot ownSlot = equipmentSlotOf(stack);
+        EquipmentSlotGroup ownSlotGroup = EquipmentSlotGroup.bySlot(ownSlot);
         for (Snapshot.BakedAttribute attribute : resolved.attributes()) {
-            EquipmentSlotGroup slot = attribute.slot() != null ? attribute.slot() : fallbackSlot;
-            event.addModifier(attribute.attribute(), attribute.modifierFor(slot), slot);
+            EquipmentSlotGroup slot = attribute.slot() != null ? attribute.slot() : ownSlotGroup;
+            EquipmentSlotGroup slotNamingTheModifier = slot.test(ownSlot) ? ownSlotGroup : slot;
+            event.addModifier(attribute.attribute(), attribute.modifierFor(slotNamingTheModifier), slot);
         }
     }
 
-    private static EquipmentSlotGroup equipmentSlotOf(ItemStack stack) {
+    private static EquipmentSlot equipmentSlotOf(ItemStack stack) {
         Equipable equipable = Equipable.get(stack);
-        return equipable == null ? EquipmentSlotGroup.MAINHAND : EquipmentSlotGroup.bySlot(equipable.getEquipmentSlot());
+        return equipable == null ? EquipmentSlot.MAINHAND : equipable.getEquipmentSlot();
     }
 
     @SubscribeEvent

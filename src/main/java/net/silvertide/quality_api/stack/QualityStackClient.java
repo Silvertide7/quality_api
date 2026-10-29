@@ -60,6 +60,7 @@ public final class QualityStackClient {
     private static final int BAR_BACKGROUND_HEIGHT = 2;
     private static final Supplier<BlockEntityWithoutLevelRenderer> HELD_ITEM_RENDERER = Suppliers.memoize(HeldItemRenderer::new);
     private static double unusedScroll;
+    private static Slot lastScrolledSlot;
 
     private QualityStackClient() {}
 
@@ -103,8 +104,13 @@ public final class QualityStackClient {
         Player player = Minecraft.getInstance().player;
         Slot hovered = screen.getSlotUnderMouse();
         if (player == null || player.isSpectator() || hovered == null || !hovered.allowModification(player)) return;
-        if (QualityStacks.contents(hovered.getItem()) == null) return;
+        QualityStackContents contents = QualityStacks.contents(hovered.getItem());
+        if (contents == null || contents.entries().size() < 2) return;
         event.setCanceled(true);
+        if (hovered != lastScrolledSlot) {
+            lastScrolledSlot = hovered;
+            unusedScroll = 0;
+        }
         unusedScroll += event.getScrollDeltaY();
         int wholeNotches = (int) unusedScroll;
         if (wholeNotches == 0) return;

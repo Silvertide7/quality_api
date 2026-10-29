@@ -4,6 +4,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class Config {
     public enum Inheritance { HIGHEST, LOWEST, AVERAGE, NONE }
@@ -28,7 +31,7 @@ public final class Config {
             .defineInRange("downgradeChance", 0.0, 0.0, 1.0);
 
     public static final ModConfigSpec.BooleanValue ROLL_ON_CRAFT = COMMON
-            .comment("Roll a weighted random quality for damageable items crafted from ingredients without quality.")
+            .comment("Roll a weighted random quality for results crafted from ingredients without quality (damageable results only while craftInheritanceDamageableOnly is on).")
             .define("rollOnCraft", false);
 
     public static final ModConfigSpec.BooleanValue RECORD_CRAFTER = COMMON
@@ -71,7 +74,7 @@ public final class Config {
     private static final ModConfigSpec.Builder CLIENT = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.BooleanValue SHOW_QUALITY_TOOLTIP = CLIENT
-            .comment("Show the quality tier and crafter lines in item tooltips, and the tier on mobs and players (see entityQualityDisplay).")
+            .comment("Show the quality tier, crafter and food bonus lines in item tooltips, and the tier on mobs and players (see entityQualityDisplay).")
             .define("showQualityTooltip", true);
 
     public static final ModConfigSpec.BooleanValue SHOW_QUALITY_MARKER = CLIENT
@@ -94,9 +97,23 @@ public final class Config {
 
     public static final ModConfigSpec.ConfigValue<List<? extends String>> HIDDEN_TOOLTIP_TIERS = CLIENT
             .comment("Quality tier ids whose name is left out of item tooltips, slot markers and mob and player labels, e.g. [\"quality_api:standard\"].")
-            .defineListAllowEmpty("hiddenTooltipTiers", List.of(), () -> "", entry -> entry instanceof String id && ResourceLocation.tryParse(id) != null);
+            .defineListAllowEmpty("hiddenTooltipTiers", List.of(), () -> "", entry -> entry instanceof String id && id.indexOf(':') > 0 && ResourceLocation.tryParse(id) != null);
+
+    private record HiddenTiers(List<? extends String> configured, Set<ResourceLocation> ids) {}
+
+    private static volatile HiddenTiers hiddenTiers = new HiddenTiers(List.of(), Set.of());
 
     public static final ModConfigSpec CLIENT_SPEC = CLIENT.build();
+
+    public static boolean isTierHidden(ResourceLocation tier) {
+        List<? extends String> configured = HIDDEN_TOOLTIP_TIERS.get();
+        HiddenTiers cached = hiddenTiers;
+        if (cached.configured() != configured) {
+            cached = new HiddenTiers(configured, configured.stream().map(ResourceLocation::tryParse).filter(Objects::nonNull).collect(Collectors.toUnmodifiableSet()));
+            hiddenTiers = cached;
+        }
+        return cached.ids().contains(tier);
+    }
 
     private Config() {}
 }

@@ -292,6 +292,12 @@ public class QualityStackGameTests {
         player.getInventory().setItem(SECOND_INVENTORY_SLOT, QualityStacks.poolIntoNewQualityStack(carrots(MASTERWORK, 5), carrots(FINE, 1)));
         rightClick(player, SECOND_INVENTORY_SLOT);
         helper.assertTrue(player.inventoryMenu.getCarried().isEmpty() && total(player.getInventory().getItem(SECOND_INVENTORY_SLOT)) == 10, "a quality stack that fits entirely should leave the cursor empty");
+        ItemStack selectedFine = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 3), carrots(MASTERWORK, 3));
+        QualityStacks.select(selectedFine, Optional.of(FINE));
+        ItemStack target = QualityStacks.poolIntoNewQualityStack(carrots(FINE, 1), carrots(SUPERIOR, 58));
+        QualityStacks.moveContents(selectedFine, target);
+        helper.assertTrue(counts(selectedFine).equals(List.of(new QualityStackContents.Entry(Optional.of(MASTERWORK), 1))) && !selectedFine.has(QualityAPI.QUALITY_STACK_SELECTION.get()),
+                "moving every selected fine carrot out should clear the selection, got " + counts(selectedFine));
         player.inventoryMenu.setCarried(QualityStacks.poolIntoNewQualityStack(stack(Items.POTATO, FINE, 2), stack(Items.POTATO, SUPERIOR, 2)));
         rightClick(player, SECOND_INVENTORY_SLOT);
         helper.assertTrue(QualityStacks.contents(player.inventoryMenu.getCarried()).accepts(carrots(null, 1)), "a potato quality stack onto a carrot one should fall back to vanilla's swap");

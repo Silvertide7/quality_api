@@ -51,7 +51,7 @@ public final class QualityStackContents {
 
     public static final StreamCodec<RegistryFriendlyByteBuf, QualityStackContents> STREAM_CODEC = StreamCodec.composite(
             ItemStack.STREAM_CODEC, contents -> contents.item,
-            Entry.STREAM_CODEC.apply(ByteBufCodecs.list()), contents -> contents.entries,
+            Entry.STREAM_CODEC.apply(ByteBufCodecs.list(LOADABLE_TOTAL_LIMIT)), contents -> contents.entries,
             QualityStackContents::new).map(QualityStackContents::validatedOrThrow, contents -> contents);
 
     private static final Comparator<Optional<ResourceLocation>> PLAIN_FIRST_THEN_BY_ID =

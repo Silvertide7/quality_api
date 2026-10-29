@@ -68,8 +68,16 @@
   "quality_api.configuration.keepPlayerQualityOnDeath": "Keep Player Quality On Death",
   "commands.quality_api.no_quality": "%s has no quality",
   "quality_api.configuration.craftInheritanceDamageableOnly": "Inherit Only Into Damageable Results",
+  "quality_api.configuration.breedInheritance": "Breed Inheritance",
+  "quality_api.configuration.qualityStacks": "Quality Stacks",
+  "quality_api.configuration.showQualityMarker": "Show Quality Marker In Slots",
+  "quality_api.configuration.qualityTooltipStyle": "Quality Tooltip Style",
+  "quality_api.configuration.entityQualityDisplay": "Entity Quality Display",
+  "quality_api.configuration.showEntityQualityParticles": "Show Entity Quality Sparkles",
   "quality_api.configuration.section.quality_api.common.toml": "Common",
   "quality_api.configuration.section.quality_api.common.toml.title": "Quality API Common Configs",
+  "quality_api.configuration.section.quality_api.server.toml": "Server",
+  "quality_api.configuration.section.quality_api.server.toml.title": "Quality API Server Configs",
   "quality_api.configuration.section.quality_api.client.toml": "Client",
   "quality_api.configuration.section.quality_api.client.toml.title": "Quality API Client Configs"
 }

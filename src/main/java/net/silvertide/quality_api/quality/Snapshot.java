@@ -126,9 +126,10 @@ public record Snapshot(
                     unknownTiers.add(tierId);
                     return;
                 }
-                modifiersByTier.put(tierId, entityModifiersOf(tierId, effects));
+                Multimap<Holder<Attribute>, AttributeModifier> tierModifiers = entityModifiersOf(tierId, effects);
+                if (!tierModifiers.isEmpty()) modifiersByTier.put(tierId, tierModifiers);
             });
-            modifiers.put(type, Map.copyOf(modifiersByTier));
+            if (!modifiersByTier.isEmpty()) modifiers.put(type, Map.copyOf(modifiersByTier));
         });
         unknownTiers.forEach(tierId -> QualityAPI.LOGGER.warn("Entity quality overrides reference unknown quality {}", tierId));
         return Map.copyOf(modifiers);

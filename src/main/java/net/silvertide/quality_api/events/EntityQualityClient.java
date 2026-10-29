@@ -77,7 +77,7 @@ public final class EntityQualityClient {
     @Nullable
     private static Component qualityLabel(Entity entity, Component name) {
         ResourceLocation tier = Qualities.getId(entity).orElse(null);
-        if (tier == null || !Config.SHOW_QUALITY_TOOLTIP.get() || Config.HIDDEN_TOOLTIP_TIERS.get().contains(tier.toString())) return null;
+        if (tier == null || !Config.SHOW_QUALITY_TOOLTIP.get() || Config.isTierHidden(tier)) return null;
         Quality quality = Qualities.get(tier).orElse(null);
         if (quality == null) return null;
         return Component.empty().append(name).append(" ").append(QualityTooltipName.of(Qualities.displayName(entity, tier), quality));

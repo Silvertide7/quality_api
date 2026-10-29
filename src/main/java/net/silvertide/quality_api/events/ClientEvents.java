@@ -37,7 +37,7 @@ public final class ClientEvents {
         boolean broken = Qualities.isBroken(stack);
         int insertAt = 1;
         if (Config.SHOW_QUALITY_TOOLTIP.get()) {
-            if (!Config.HIDDEN_TOOLTIP_TIERS.get().contains(tier.toString())) {
+            if (!Config.isTierHidden(tier)) {
                 insertAt = insert(lines, insertAt, QualityTooltipName.of(Qualities.displayName(stack, tier), quality));
             }
             String crafter = stack.get(QualityAPI.CRAFTER.get());

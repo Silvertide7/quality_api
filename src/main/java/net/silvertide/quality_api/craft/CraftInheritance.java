@@ -56,7 +56,7 @@ public final class CraftInheritance {
 
     @Nullable
     private static ResourceLocation rollIfConfigured(ItemStack result, RandomSource random) {
-        if (!Config.ROLL_ON_CRAFT.get() || !result.isDamageableItem()) return null;
+        if (!Config.ROLL_ON_CRAFT.get()) return null;
         return Qualities.roll(result, random).orElse(null);
     }
 

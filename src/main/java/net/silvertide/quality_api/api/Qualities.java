@@ -15,6 +15,7 @@ import net.silvertide.quality_api.quality.EntityQualityModifiers;
 import net.silvertide.quality_api.quality.Quality;
 import net.silvertide.quality_api.quality.Snapshot;
 import net.silvertide.silverlib.feature.breakage.BrokenItems;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +26,7 @@ public final class Qualities {
     private Qualities() {}
 
     public static Optional<ResourceLocation> getId(ItemStack stack) {
-        return Optional.ofNullable(stack.get(QualityAPI.QUALITY.get())).filter(Snapshot.current().tiers()::containsKey);
+        return loadedTier(stack.get(QualityAPI.QUALITY.get()));
     }
 
     public static Optional<Quality> get(ItemStack stack) {
@@ -34,7 +35,11 @@ public final class Qualities {
     }
 
     public static Optional<ResourceLocation> getId(Entity entity) {
-        return entity.getExistingData(QualityAPI.ENTITY_QUALITY).filter(Snapshot.current().tiers()::containsKey);
+        return loadedTier(entity.getExistingDataOrNull(QualityAPI.ENTITY_QUALITY));
+    }
+
+    private static Optional<ResourceLocation> loadedTier(@Nullable ResourceLocation id) {
+        return id != null && Snapshot.current().tiers().containsKey(id) ? Optional.of(id) : Optional.empty();
     }
 
     public static Optional<Quality> get(Entity entity) {
