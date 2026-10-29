@@ -12,6 +12,7 @@ import net.minecraft.world.item.ItemUtils;
 import net.minecraft.world.item.TooltipFlag;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
+import net.silvertide.quality_api.quality.QualityTooltipName;
 
 import java.util.List;
 import java.util.Optional;
@@ -57,7 +58,7 @@ public class QualityStackItem extends Item {
     private static Component tierName(QualityStackContents contents, Optional<ResourceLocation> tier) {
         if (tier.isEmpty()) return Component.translatable("quality_api.tooltip.quality_stack.plain");
         ResourceLocation id = tier.get();
-        return Qualities.get(id).isPresent() ? Qualities.displayName(contents.template(), id) : Component.literal(id.toString());
+        return Qualities.get(id).map(quality -> QualityTooltipName.of(Qualities.displayName(contents.template(), id), quality)).orElseGet(() -> Component.literal(id.toString()));
     }
 
     @Override

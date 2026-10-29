@@ -8,6 +8,8 @@ import java.util.List;
 public final class Config {
     public enum Inheritance { HIGHEST, LOWEST, AVERAGE, NONE }
 
+    public enum TooltipStyle { BOTH, SYMBOLS, TEXT }
+
     private static final ModConfigSpec.Builder COMMON = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.EnumValue<Inheritance> CRAFT_INHERITANCE = COMMON
@@ -63,6 +65,11 @@ public final class Config {
     public static final ModConfigSpec.BooleanValue SHOW_QUALITY_TOOLTIP = CLIENT
             .comment("Show the quality tier and crafter lines in item tooltips.")
             .define("showQualityTooltip", true);
+
+    public static final ModConfigSpec.EnumValue<TooltipStyle> QUALITY_TOOLTIP_STYLE = CLIENT
+            .comment("How an item's quality shows in tooltips: BOTH the tier name followed by stars, SYMBOLS the stars alone, or TEXT the name alone.",
+                    "Stars are half a star per level above -2: crude is half a star, standard one star, masterwork three.")
+            .defineEnum("qualityTooltipStyle", TooltipStyle.BOTH);
 
     public static final ModConfigSpec.ConfigValue<List<? extends String>> HIDDEN_TOOLTIP_TIERS = CLIENT
             .comment("Quality tier ids whose name is left out of item tooltips, e.g. [\"quality_api:standard\"].")

@@ -16,6 +16,7 @@ import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
 import net.silvertide.quality_api.quality.Quality;
+import net.silvertide.quality_api.quality.QualityTooltipName;
 import net.silvertide.quality_api.quality.Snapshot;
 import org.jetbrains.annotations.Nullable;
 
@@ -37,7 +38,7 @@ public final class ClientEvents {
         boolean broken = Qualities.isBroken(stack);
         int insertAt = 1;
         if (Config.SHOW_QUALITY_TOOLTIP.get()) {
-            Component tierName = Config.HIDDEN_TOOLTIP_TIERS.get().contains(tier.toString()) ? null : Qualities.displayName(stack, tier);
+            Component tierName = Config.HIDDEN_TOOLTIP_TIERS.get().contains(tier.toString()) ? null : QualityTooltipName.of(Qualities.displayName(stack, tier), quality);
             Component qualityLine = qualityLine(tierName, stack.get(QualityAPI.CRAFTER.get()));
             if (qualityLine != null) insertAt = insert(lines, insertAt, qualityLine);
             FoodProperties food = stack.getFoodProperties(event.getEntity());

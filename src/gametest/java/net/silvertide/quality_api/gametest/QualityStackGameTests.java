@@ -360,8 +360,8 @@ public class QualityStackGameTests {
         QualityStacks.insert(qualityStack, carrots(MASTERWORK, 20));
         QualityStacks.insert(qualityStack, carrots(REMOVED_TIER, 2));
         List<String> lines = qualityStack.getTooltipLines(Item.TooltipContext.EMPTY, null, TooltipFlag.NORMAL).stream().map(Component::getString).toList();
-        String masterwork = Qualities.displayName(carrots(MASTERWORK, 1), MASTERWORK).getString();
-        String fine = Qualities.displayName(carrots(FINE, 1), FINE).getString();
+        String masterwork = Qualities.displayName(carrots(MASTERWORK, 1), MASTERWORK).getString() + " \uE000\uE000\uE000";
+        String fine = Qualities.displayName(carrots(FINE, 1), FINE).getString() + " \uE000\uE001";
         List<String> expected = List.of("Carrot", masterwork + " ×20", fine + " ×10", "Plain ×3", REMOVED_TIER + " ×2", "35 / 64", "Scroll to Select - Right Click to Remove");
         helper.assertTrue(lines.equals(expected), "the tooltip should list tiers best first then the total, expected " + expected + " got " + lines);
         ItemStack goldenApples = QualityStacks.poolIntoNewQualityStack(stack(Items.ENCHANTED_GOLDEN_APPLE, FINE, 1), stack(Items.ENCHANTED_GOLDEN_APPLE, SUPERIOR, 1));

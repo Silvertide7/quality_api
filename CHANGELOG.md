@@ -5,6 +5,7 @@
 - Quality stacks look like the item they hold, with the total count and a bar along the top split by tier colour.
 - Items you pick up go into a quality stack you carry first; anything that does not fit is picked up normally.
 - A quality stack destroyed by fire, lava or a cactus spills its contents. Only stackable, undamageable items can be pooled, and only when everything but quality matches.
+- Tooltips can show quality as stars: client config `qualityTooltipStyle` is BOTH (tier name then stars, the default), SYMBOLS (stars only) or TEXT (name only). Stars go up by half a star per level: crude ½, standard 1, fine 1½ up to masterwork 3, in the tier's colour.
 - New server config `qualityStacks` (default on) turns off making quality stacks and auto-pickup; existing quality stacks can still be emptied.
 
 1.4.0
