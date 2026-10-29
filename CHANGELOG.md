@@ -1,3 +1,7 @@
+1.6.0
+---
+- Tooltips can show quality as stars: client config `qualityTooltipStyle` is BOTH (tier name then stars, the default), SYMBOLS (stars only) or TEXT (name only). Stars go up by half a star per level: crude ½, standard 1, fine 1½ up to masterwork 3, in the tier's colour. "Crafted by" now has its own line under the quality.
+
 1.5.0
 ---
 - Quality stacks: one slot holds one stack's worth of an item across every tier, so quality no longer splits a stack of carrots into a slot per tier. Right-click an item onto the same item of another quality to make one; right-click items onto it to add them; right-click it with an empty cursor to take a tier out; carry it and right-click a slot to take that slot's items in, or an empty slot to put a tier down. Left-click stays vanilla. It turns back into a normal stack when one tier is left.
@@ -5,7 +9,6 @@
 - Quality stacks look like the item they hold, with the total count and a bar along the top split by tier colour.
 - Items you pick up go into a quality stack you carry first; anything that does not fit is picked up normally.
 - A quality stack destroyed by fire, lava or a cactus spills its contents. Only stackable, undamageable items can be pooled, and only when everything but quality matches.
-- Tooltips can show quality as stars: client config `qualityTooltipStyle` is BOTH (tier name then stars, the default), SYMBOLS (stars only) or TEXT (name only). Stars go up by half a star per level: crude ½, standard 1, fine 1½ up to masterwork 3, in the tier's colour. "Crafted by" now has its own line under the quality.
 - New server config `qualityStacks` (default on) turns off making quality stacks and auto-pickup; existing quality stacks can still be emptied.
 
 1.4.0
