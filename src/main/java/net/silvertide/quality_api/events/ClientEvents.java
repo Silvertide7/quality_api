@@ -18,7 +18,6 @@ import net.silvertide.quality_api.api.Qualities;
 import net.silvertide.quality_api.quality.Quality;
 import net.silvertide.quality_api.quality.QualityTooltipName;
 import net.silvertide.quality_api.quality.Snapshot;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,9 +37,13 @@ public final class ClientEvents {
         boolean broken = Qualities.isBroken(stack);
         int insertAt = 1;
         if (Config.SHOW_QUALITY_TOOLTIP.get()) {
-            Component tierName = Config.HIDDEN_TOOLTIP_TIERS.get().contains(tier.toString()) ? null : QualityTooltipName.of(Qualities.displayName(stack, tier), quality);
-            Component qualityLine = qualityLine(tierName, stack.get(QualityAPI.CRAFTER.get()));
-            if (qualityLine != null) insertAt = insert(lines, insertAt, qualityLine);
+            if (!Config.HIDDEN_TOOLTIP_TIERS.get().contains(tier.toString())) {
+                insertAt = insert(lines, insertAt, QualityTooltipName.of(Qualities.displayName(stack, tier), quality));
+            }
+            String crafter = stack.get(QualityAPI.CRAFTER.get());
+            if (crafter != null) {
+                insertAt = insert(lines, insertAt, Component.translatable("quality_api.tooltip.crafter", crafter).withStyle(ChatFormatting.GRAY));
+            }
             FoodProperties food = stack.getFoodProperties(event.getEntity());
             Snapshot.Resolved resolved = food == null ? null : Snapshot.current().resolved(stack.getItem(), tier);
             if (resolved != null && !broken && resolved.changesFood(food)) {
@@ -95,14 +98,6 @@ public final class ClientEvents {
 
     private static MutableComponent gray(MutableComponent line) {
         return line.withStyle(ChatFormatting.GRAY);
-    }
-
-    @Nullable
-    private static Component qualityLine(@Nullable Component tierName, @Nullable String crafter) {
-        if (crafter == null) return tierName;
-        MutableComponent craftedBy = Component.translatable("quality_api.tooltip.crafter", crafter).withStyle(ChatFormatting.GRAY);
-        if (tierName == null) return craftedBy;
-        return tierName.copy().append(Component.literal(" - ").withStyle(ChatFormatting.GRAY)).append(craftedBy);
     }
 
     private static int insert(List<Component> lines, int index, Component line) {

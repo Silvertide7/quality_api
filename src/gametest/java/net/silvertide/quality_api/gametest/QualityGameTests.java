@@ -22,6 +22,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -73,6 +74,8 @@ import net.silvertide.quality_api.api.QualityLootEvent;
 import net.silvertide.quality_api.craft.MinQualityIngredient;
 import net.silvertide.quality_api.quality.EntityQualityEffects;
 import net.silvertide.quality_api.quality.EntityQualityModifiers;
+import net.silvertide.quality_api.quality.Quality;
+import net.silvertide.quality_api.quality.QualityTooltipName;
 import net.silvertide.quality_api.quality.QualityEffects;
 import net.silvertide.quality_api.quality.Snapshot;
 
@@ -934,5 +937,27 @@ public class QualityGameTests {
             if (stack.is(item)) return stack;
         }
         return null;
+    }
+
+    @GameTest(template = EMPTY)
+    public static void tooltipStarsFollowTheStyleAndLevel(GameTestHelper helper) {
+        Quality masterwork = Qualities.get(QualityAPI.id("masterwork")).orElseThrow();
+        Component name = Component.literal("Masterwork");
+        helper.assertTrue(QualityTooltipName.of(name, masterwork, Config.TooltipStyle.BOTH).getString().equals("Masterwork \uE000\uE000\uE000"), "BOTH should show the name then three stars for masterwork");
+        helper.assertTrue(QualityTooltipName.of(name, masterwork, Config.TooltipStyle.TEXT).getString().equals("Masterwork"), "TEXT should show only the name");
+        Component symbols = QualityTooltipName.of(name, masterwork, Config.TooltipStyle.SYMBOLS);
+        Component withCrafter = symbols.copy().append(" - Crafted by Steve");
+        helper.assertTrue(symbols.getString().equals("\uE000\uE000\uE000") && withCrafter.getStyle().getFont().equals(Style.DEFAULT_FONT),
+                "SYMBOLS should show only stars, and text appended after them must stay in the normal font");
+        helper.assertTrue(QualityTooltipName.of(name, tierAtLevel(-1), Config.TooltipStyle.SYMBOLS).getString().equals("\uE001"), "level -1 should be half a star");
+        helper.assertTrue(QualityTooltipName.of(name, tierAtLevel(0), Config.TooltipStyle.SYMBOLS).getString().equals("\uE000"), "level 0 should be one star");
+        helper.assertTrue(QualityTooltipName.of(name, tierAtLevel(-2), Config.TooltipStyle.SYMBOLS).getString().equals("Masterwork"), "a tier with no stars should fall back to its name");
+        helper.assertTrue(QualityTooltipName.of(name, tierAtLevel(Integer.MAX_VALUE), Config.TooltipStyle.SYMBOLS).getString().equals("\uE000".repeat(5)), "very high levels should stop at five stars");
+        helper.succeed();
+    }
+
+    private static Quality tierAtLevel(int level) {
+        Quality masterwork = Qualities.get(QualityAPI.id("masterwork")).orElseThrow();
+        return new Quality(level, masterwork.color(), masterwork.weight(), masterwork.items(), masterwork.effects());
     }
 }

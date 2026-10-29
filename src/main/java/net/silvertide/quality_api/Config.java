@@ -68,7 +68,7 @@ public final class Config {
 
     public static final ModConfigSpec.EnumValue<TooltipStyle> QUALITY_TOOLTIP_STYLE = CLIENT
             .comment("How an item's quality shows in tooltips: BOTH the tier name followed by stars, SYMBOLS the stars alone, or TEXT the name alone.",
-                    "Stars are half a star per level above -2: crude is half a star, standard one star, masterwork three.")
+                    "Stars are half a star per level above -2, at most five: crude is half a star, standard one star, masterwork three. Tiers at level -2 or below always show their name.")
             .defineEnum("qualityTooltipStyle", TooltipStyle.BOTH);
 
     public static final ModConfigSpec.ConfigValue<List<? extends String>> HIDDEN_TOOLTIP_TIERS = CLIENT
