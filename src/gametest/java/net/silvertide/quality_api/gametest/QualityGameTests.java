@@ -56,6 +56,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.Enchantments;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.event.EventHooks;
@@ -67,6 +68,7 @@ import net.neoforged.neoforge.registries.datamaps.AdvancedDataMapType;
 import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
+import net.silvertide.quality_api.api.QualityBreedEvent;
 import net.silvertide.quality_api.api.QualityCraftEvent;
 import net.silvertide.quality_api.api.QualityFoodEatenEvent;
 import net.silvertide.quality_api.api.QualityItemBrokenEvent;
@@ -78,14 +80,17 @@ import net.silvertide.quality_api.quality.Quality;
 import net.silvertide.quality_api.quality.QualityTooltipName;
 import net.silvertide.quality_api.quality.QualityEffects;
 import net.silvertide.quality_api.quality.Snapshot;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -627,8 +632,8 @@ public class QualityGameTests {
         Map<ResourceLocation, EntityQualityEffects> tagEntry = EntityQualityEffects.OVERRIDES_CODEC.parse(
                 helper.getLevel().registryAccess().createSerializationContext(JsonOps.INSTANCE),
                 JsonParser.parseString("{\"quality_api:superior\": {\"attributes\": [{\"type\": \"minecraft:generic.max_health\", \"operation\": \"add_value\", \"amount\": 4.0}]}}")).getOrThrow();
-        Map<ResourceLocation, EntityQualityEffects> typeEntry = Map.of(SUPERIOR, new EntityQualityEffects(Optional.of(List.of())));
-        Map<ResourceLocation, EntityQualityEffects> emptyPatch = Map.of(SUPERIOR, new EntityQualityEffects(Optional.empty()));
+        Map<ResourceLocation, EntityQualityEffects> typeEntry = Map.of(SUPERIOR, new EntityQualityEffects(Optional.of(List.of()), Optional.empty()));
+        Map<ResourceLocation, EntityQualityEffects> emptyPatch = Map.of(SUPERIOR, new EntityQualityEffects(Optional.empty(), Optional.empty()));
         Either<TagKey<EntityType<?>>, ResourceKey<EntityType<?>>> animals = Either.left(TagKey.create(Registries.ENTITY_TYPE, QualityAPI.id("animals")));
         Either<TagKey<EntityType<?>>, ResourceKey<EntityType<?>>> cowKey = Either.right(ResourceKey.create(Registries.ENTITY_TYPE, ResourceLocation.withDefaultNamespace("cow")));
         Registry<EntityType<?>> entityTypes = helper.getLevel().registryAccess().registryOrThrow(Registries.ENTITY_TYPE);
@@ -636,6 +641,30 @@ public class QualityGameTests {
         helper.assertTrue(EntityQualityEffects.mergeOverrides(entityTypes, cowKey, typeEntry, animals, tagEntry).get(SUPERIOR).attributes().orElseThrow().isEmpty(), "a type entry should beat a later tag entry");
         helper.assertTrue(EntityQualityEffects.mergeOverrides(entityTypes, animals, tagEntry, cowKey, typeEntry).get(SUPERIOR).attributes().orElseThrow().isEmpty(), "a type entry should beat an earlier tag entry");
         helper.assertTrue(EntityQualityEffects.mergeOverrides(entityTypes, animals, tagEntry, cowKey, emptyPatch).get(SUPERIOR).attributes().orElseThrow().size() == 1, "a type entry that names no field should keep the tag's attributes");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void entityTintsBakePerTypeAndTierAndPatchOnTheirOwn(GameTestHelper helper) {
+        Snapshot snapshot = Snapshot.current();
+        helper.assertTrue(snapshot.entityTint(EntityType.COW, CRUDE) == 0xFF9CCC65, "the test pack tints crude cows green");
+        helper.assertTrue(snapshot.entityTint(EntityType.PLAYER, MASTERWORK) == 0xFFFFD54F, "the test pack tints masterwork players gold");
+        helper.assertTrue(snapshot.entityTint(EntityType.COW, MASTERWORK) == Snapshot.UNTINTED, "a tier entry without a tint is untinted");
+        helper.assertTrue(snapshot.entityTint(EntityType.ZOMBIE, CRUDE) == Snapshot.UNTINTED, "a white tint bakes to untinted");
+        helper.assertTrue(snapshot.entityTint(EntityType.PIG, CRUDE) == Snapshot.UNTINTED, "a type without an entry is untinted");
+        helper.assertTrue(snapshot.entityTint(EntityType.COW, null) == Snapshot.UNTINTED, "no quality is untinted");
+        Map<ResourceLocation, EntityQualityEffects> tagEntry = EntityQualityEffects.OVERRIDES_CODEC.parse(
+                helper.getLevel().registryAccess().createSerializationContext(JsonOps.INSTANCE),
+                JsonParser.parseString("{\"quality_api:crude\": {\"tint\": \"#9CCC65\", \"attributes\": [{\"type\": \"minecraft:generic.max_health\", \"operation\": \"add_value\", \"amount\": -2.0}]}}")).getOrThrow();
+        Map<ResourceLocation, EntityQualityEffects> whiteTintPatch = EntityQualityEffects.OVERRIDES_CODEC.parse(
+                helper.getLevel().registryAccess().createSerializationContext(JsonOps.INSTANCE),
+                JsonParser.parseString("{\"quality_api:crude\": {\"tint\": \"#FFFFFF\"}}")).getOrThrow();
+        Either<TagKey<EntityType<?>>, ResourceKey<EntityType<?>>> animals = Either.left(TagKey.create(Registries.ENTITY_TYPE, QualityAPI.id("animals")));
+        Either<TagKey<EntityType<?>>, ResourceKey<EntityType<?>>> cowKey = Either.right(ResourceKey.create(Registries.ENTITY_TYPE, ResourceLocation.withDefaultNamespace("cow")));
+        Registry<EntityType<?>> entityTypes = helper.getLevel().registryAccess().registryOrThrow(Registries.ENTITY_TYPE);
+        EntityQualityEffects merged = EntityQualityEffects.mergeOverrides(entityTypes, animals, tagEntry, cowKey, whiteTintPatch).get(CRUDE);
+        helper.assertTrue(merged.tint().orElseThrow().getValue() == 0xFFFFFF, "the type entry's tint should win");
+        helper.assertTrue(merged.attributes().orElseThrow().size() == 1, "a tint-only patch should keep the tag's attributes");
         helper.succeed();
     }
 
@@ -834,7 +863,7 @@ public class QualityGameTests {
         Snapshot loaded = Snapshot.current();
         Map<Item, Map<ResourceLocation, Snapshot.Resolved>> overrides = new HashMap<>(loaded.overrides());
         overrides.put(item, Map.of(tier, Snapshot.Resolved.of(tier, loaded.tiers().get(tier).effects().patchedWith(patch))));
-        installSnapshot(new Snapshot(loaded.tiers(), loaded.idsByLevel(), loaded.base(), Map.copyOf(overrides), loaded.nameSets(), loaded.entityNameSets(), loaded.entityModifiers()));
+        installSnapshot(new Snapshot(loaded.tiers(), loaded.idsByLevel(), loaded.base(), Map.copyOf(overrides), loaded.nameSets(), loaded.entityNameSets(), loaded.entityModifiers(), loaded.entityTints()));
         try {
             body.run();
         } finally {
@@ -844,8 +873,8 @@ public class QualityGameTests {
 
     private static Snapshot withEntityAttributes(Snapshot loaded, EntityType<?> type, ResourceLocation tier, List<EntityQualityEffects.EntityAttributeEffect> attributes) {
         Map<EntityType<?>, Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>>> entityModifiers = new HashMap<>(loaded.entityModifiers());
-        entityModifiers.put(type, Map.of(tier, Snapshot.entityModifiersOf(tier, new EntityQualityEffects(Optional.of(attributes)))));
-        return new Snapshot(loaded.tiers(), loaded.idsByLevel(), loaded.base(), loaded.overrides(), loaded.nameSets(), loaded.entityNameSets(), Map.copyOf(entityModifiers));
+        entityModifiers.put(type, Map.of(tier, Snapshot.entityModifiersOf(tier, new EntityQualityEffects(Optional.of(attributes), Optional.empty()))));
+        return new Snapshot(loaded.tiers(), loaded.idsByLevel(), loaded.base(), loaded.overrides(), loaded.nameSets(), loaded.entityNameSets(), Map.copyOf(entityModifiers), loaded.entityTints());
     }
 
     private static void runCommand(GameTestHelper helper, String command) {
@@ -958,6 +987,64 @@ public class QualityGameTests {
 
     private static Quality tierAtLevel(int level) {
         Quality masterwork = Qualities.get(QualityAPI.id("masterwork")).orElseThrow();
-        return new Quality(level, masterwork.color(), masterwork.weight(), masterwork.items(), masterwork.effects());
+        return new Quality(level, masterwork.color(), masterwork.weight(), masterwork.items(), masterwork.effects(), masterwork.particleColor());
+    }
+
+    @GameTest(template = EMPTY)
+    public static void bredAnimalsInheritTheirParentsQualityByConfig(GameTestHelper helper) {
+        Config.Inheritance configuredInheritance = Config.BREED_INHERITANCE.get();
+        try {
+            Config.BREED_INHERITANCE.set(Config.Inheritance.AVERAGE);
+            Cow superiorCalf = breedCalf(helper, FINE, EXQUISITE);
+            helper.assertTrue(Qualities.getId(superiorCalf).equals(Optional.of(SUPERIOR)), "fine and exquisite parents should average to a superior baby");
+            helper.assertTrue(superiorCalf.getMaxHealth() == EntityType.COW.create(helper.getLevel()).getMaxHealth() + 10.0F && superiorCalf.getHealth() == superiorCalf.getMaxHealth(),
+                    "a superior calf should get the superior cow bonus and start at full health, had " + superiorCalf.getHealth() + "/" + superiorCalf.getMaxHealth());
+            superiorCalf.discard();
+            Set<ResourceLocation> halfwayCalves = new HashSet<>();
+            for (int calf = 0; calf < 24; calf++) babyQuality(helper, FINE, SUPERIOR).ifPresent(halfwayCalves::add);
+            helper.assertTrue(halfwayCalves.equals(Set.of(FINE, SUPERIOR)), "fine and superior parents should roll fine or superior, got " + halfwayCalves);
+            helper.assertTrue(babyQuality(helper, null, null).isEmpty(), "parents without quality should have a plain baby");
+            Config.BREED_INHERITANCE.set(Config.Inheritance.HIGHEST);
+            helper.assertTrue(babyQuality(helper, MASTERWORK, null).equals(Optional.of(MASTERWORK)), "HIGHEST should take the masterwork parent");
+            Config.BREED_INHERITANCE.set(Config.Inheritance.LOWEST);
+            helper.assertTrue(babyQuality(helper, MASTERWORK, null).equals(Qualities.forLevel(0)), "LOWEST should count a plain parent as level 0");
+            Config.BREED_INHERITANCE.set(Config.Inheritance.NONE);
+            helper.assertTrue(babyQuality(helper, MASTERWORK, MASTERWORK).isEmpty(), "NONE should leave the baby plain");
+            Object exquisiteBreeder = new Object() {
+                @SubscribeEvent
+                public void decide(QualityBreedEvent event) {
+                    event.setQuality(EXQUISITE);
+                }
+            };
+            NeoForge.EVENT_BUS.register(exquisiteBreeder);
+            try {
+                helper.assertTrue(babyQuality(helper, null, null).equals(Optional.of(EXQUISITE)), "QualityBreedEvent should fire under NONE with plain parents and its tier should win");
+            } finally {
+                NeoForge.EVENT_BUS.unregister(exquisiteBreeder);
+            }
+        } finally {
+            Config.BREED_INHERITANCE.set(configuredInheritance);
+        }
+        helper.succeed();
+    }
+
+    private static Optional<ResourceLocation> babyQuality(GameTestHelper helper, @Nullable ResourceLocation tierA, @Nullable ResourceLocation tierB) {
+        Cow calf = breedCalf(helper, tierA, tierB);
+        Optional<ResourceLocation> quality = Qualities.getId(calf);
+        calf.discard();
+        return quality;
+    }
+
+    private static Cow breedCalf(GameTestHelper helper, @Nullable ResourceLocation tierA, @Nullable ResourceLocation tierB) {
+        Cow parentA = helper.spawn(EntityType.COW, new BlockPos(1, 2, 1));
+        Cow parentB = helper.spawn(EntityType.COW, new BlockPos(1, 2, 1));
+        if (tierA != null) Qualities.apply(parentA, tierA);
+        if (tierB != null) Qualities.apply(parentB, tierB);
+        parentA.spawnChildFromBreeding(helper.getLevel(), parentB);
+        List<Cow> babies = helper.getLevel().getEntitiesOfClass(Cow.class, parentA.getBoundingBox().inflate(2), Cow::isBaby);
+        helper.assertTrue(babies.size() == 1, "breeding should spawn exactly one calf, found " + babies.size());
+        parentA.discard();
+        parentB.discard();
+        return babies.get(0);
     }
 }

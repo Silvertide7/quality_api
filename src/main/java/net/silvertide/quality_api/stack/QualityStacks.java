@@ -5,8 +5,11 @@ import net.minecraft.world.item.ItemStack;
 import net.silvertide.quality_api.QualityAPI;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class QualityStacks {
     private QualityStacks() {}
@@ -40,6 +43,35 @@ public final class QualityStacks {
         if (moved <= 0) return 0;
         qualityStack.set(QualityAPI.QUALITY_STACK_CONTENTS.get(), contents.plus(tierOf(stack), moved));
         stack.shrink(moved);
+        return moved;
+    }
+
+    public static boolean holdSameItem(ItemStack firstQualityStack, ItemStack secondQualityStack) {
+        QualityStackContents first = contents(firstQualityStack);
+        QualityStackContents second = contents(secondQualityStack);
+        return first != null && second != null && second.accepts(first.stackOf(Optional.empty(), 1));
+    }
+
+    public static int moveContents(ItemStack fromQualityStack, ItemStack intoQualityStack) {
+        if (fromQualityStack == intoQualityStack || !holdSameItem(fromQualityStack, intoQualityStack)) return 0;
+        QualityStackContents source = contents(fromQualityStack);
+        QualityStackContents target = contents(intoQualityStack);
+        Set<Optional<ResourceLocation>> tiersAlreadyHeld = target.entries().stream().map(QualityStackContents.Entry::tier).collect(Collectors.toSet());
+        List<QualityStackContents.Entry> heldTiersFirst = source.entriesBestFirst().stream()
+                .sorted(Comparator.comparing((QualityStackContents.Entry entry) -> !tiersAlreadyHeld.contains(entry.tier())))
+                .toList();
+        int moved = 0;
+        for (QualityStackContents.Entry entry : heldTiersFirst) {
+            int count = Math.min(entry.count(), target.capacity() - target.total());
+            if (count <= 0) break;
+            target = target.plus(entry.tier(), count);
+            source = source.minus(entry.tier(), count);
+            moved += count;
+        }
+        if (moved == 0) return 0;
+        intoQualityStack.set(QualityAPI.QUALITY_STACK_CONTENTS.get(), target);
+        if (source.isEmpty()) fromQualityStack.setCount(0);
+        else fromQualityStack.set(QualityAPI.QUALITY_STACK_CONTENTS.get(), source);
         return moved;
     }
 

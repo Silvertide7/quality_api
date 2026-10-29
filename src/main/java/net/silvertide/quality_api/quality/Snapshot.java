@@ -11,6 +11,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FastColor;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlotGroup;
@@ -39,9 +40,11 @@ public record Snapshot(
         Map<Item, Map<ResourceLocation, Resolved>> overrides,
         Map<Item, String> nameSets,
         Map<EntityType<?>, String> entityNameSets,
-        Map<EntityType<?>, Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>>> entityModifiers) {
+        Map<EntityType<?>, Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>>> entityModifiers,
+        Map<EntityType<?>, Map<ResourceLocation, Integer>> entityTints) {
 
-    public static final Snapshot EMPTY = new Snapshot(Map.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+    public static final int UNTINTED = 0xFFFFFFFF;
+    public static final Snapshot EMPTY = new Snapshot(Map.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
 
     private static volatile Snapshot current = EMPTY;
 
@@ -74,7 +77,8 @@ public record Snapshot(
         current = new Snapshot(Map.copyOf(tiers), idsByLevel, Map.copyOf(base), overrides,
                 resolveNameSets(items, QualityAPI.NAME_SET),
                 resolveNameSets(entityTypes, QualityAPI.ENTITY_NAME_SET),
-                resolveEntityModifiers(entityTypes, tiers));
+                resolveEntityModifiers(entityTypes, tiers),
+                resolveEntityTints(entityTypes, tiers));
         QualityAPI.LOGGER.info("Loaded {} qualities and {} item overrides", tiers.size(), overrides.size());
         if (!current.entityModifiers().isEmpty()) QualityAPI.LOGGER.info("Loaded entity attribute overrides for {} entity types", current.entityModifiers().size());
     }
@@ -130,6 +134,21 @@ public record Snapshot(
         return Map.copyOf(modifiers);
     }
 
+    private static Map<EntityType<?>, Map<ResourceLocation, Integer>> resolveEntityTints(Registry<EntityType<?>> entityTypes, Map<ResourceLocation, Quality> tiers) {
+        Map<EntityType<?>, Map<ResourceLocation, Integer>> tints = new HashMap<>();
+        entityTypes.getDataMap(QualityAPI.ENTITY_QUALITIES).forEach((typeKey, effectsByTier) -> {
+            EntityType<?> type = entityTypes.get(typeKey);
+            if (type == null) return;
+            Map<ResourceLocation, Integer> tintsByTier = new HashMap<>();
+            effectsByTier.forEach((tierId, effects) -> effects.tint()
+                    .map(tint -> FastColor.ARGB32.opaque(tint.getValue()))
+                    .filter(tint -> tint != UNTINTED && tiers.containsKey(tierId))
+                    .ifPresent(tint -> tintsByTier.put(tierId, tint)));
+            if (!tintsByTier.isEmpty()) tints.put(type, Map.copyOf(tintsByTier));
+        });
+        return Map.copyOf(tints);
+    }
+
     public static Multimap<Holder<Attribute>, AttributeModifier> entityModifiersOf(ResourceLocation tier, EntityQualityEffects effects) {
         List<EntityQualityEffects.EntityAttributeEffect> attributeEffects = effects.attributes().orElse(List.of());
         ImmutableMultimap.Builder<Holder<Attribute>, AttributeModifier> modifiers = ImmutableMultimap.builder();
@@ -146,6 +165,13 @@ public record Snapshot(
         Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>> perType = entityModifiers.get(type);
         Multimap<Holder<Attribute>, AttributeModifier> modifiers = perType == null ? null : perType.get(tier);
         return modifiers == null ? ImmutableMultimap.of() : modifiers;
+    }
+
+    public int entityTint(EntityType<?> type, @Nullable ResourceLocation tier) {
+        if (tier == null) return UNTINTED;
+        Map<ResourceLocation, Integer> perType = entityTints.get(type);
+        Integer tint = perType == null ? null : perType.get(tier);
+        return tint == null ? UNTINTED : tint;
     }
 
     @Nullable

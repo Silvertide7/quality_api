@@ -12,13 +12,14 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.Optional;
 
-public record Quality(int level, TextColor color, int weight, Optional<HolderSet<Item>> items, QualityEffects effects) {
+public record Quality(int level, TextColor color, int weight, Optional<HolderSet<Item>> items, QualityEffects effects, Optional<TextColor> particleColor) {
     public static final Codec<Quality> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.fieldOf("level").forGetter(Quality::level),
             TextColor.CODEC.optionalFieldOf("color", TextColor.fromLegacyFormat(ChatFormatting.WHITE)).forGetter(Quality::color),
             Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("weight", 0).forGetter(Quality::weight),
             RegistryCodecs.homogeneousList(Registries.ITEM).optionalFieldOf("items").forGetter(Quality::items),
-            QualityEffects.CODEC.optionalFieldOf("effects", QualityEffects.EMPTY).forGetter(Quality::effects)
+            QualityEffects.CODEC.optionalFieldOf("effects", QualityEffects.EMPTY).forGetter(Quality::effects),
+            TextColor.CODEC.optionalFieldOf("particle_color").forGetter(Quality::particleColor)
     ).apply(instance, Quality::new));
 
     public boolean appliesTo(ItemStack stack) {

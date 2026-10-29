@@ -274,6 +274,31 @@ public class QualityStackGameTests {
     }
 
     @GameTest(template = EMPTY)
+    public static void rightClickingAQualityStackOntoAnotherFillsItWithItsOwnTiersFirst(GameTestHelper helper) {
+        ServerPlayer player = clickingPlayer(helper);
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, QualityStacks.poolIntoNewQualityStack(carrots(FINE, 20), carrots(SUPERIOR, 20)));
+        player.inventoryMenu.setCarried(QualityStacks.poolIntoNewQualityStack(carrots(MASTERWORK, 30), carrots(FINE, 10)));
+        Map<String, Integer> before = carrotsByTier(player);
+        rightClick(player, FIRST_INVENTORY_SLOT);
+        ItemStack inSlot = player.getInventory().getItem(FIRST_INVENTORY_SLOT);
+        helper.assertTrue(counts(inSlot).equals(List.of(new QualityStackContents.Entry(Optional.of(FINE), 30), new QualityStackContents.Entry(Optional.of(MASTERWORK), 14), new QualityStackContents.Entry(Optional.of(SUPERIOR), 20))),
+                "the slot's quality stack should take the fine carrots it already holds before any masterwork, got " + counts(inSlot));
+        helper.assertTrue(isCarrots(player.inventoryMenu.getCarried(), MASTERWORK, 16), "the masterwork left on the cursor should turn back into plain carrots");
+        helper.assertTrue(carrotsByTier(player).equals(before), "merging should keep every carrot, had " + before + " now " + carrotsByTier(player));
+        rightClick(player, FIRST_INVENTORY_SLOT);
+        helper.assertTrue(isCarrots(player.inventoryMenu.getCarried(), MASTERWORK, 16) && total(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) == CARROT_CAPACITY,
+                "carrots onto a full quality stack should stay on the cursor");
+        player.inventoryMenu.setCarried(QualityStacks.poolIntoNewQualityStack(carrots(FINE, 2), carrots(SUPERIOR, 2)));
+        player.getInventory().setItem(SECOND_INVENTORY_SLOT, QualityStacks.poolIntoNewQualityStack(carrots(MASTERWORK, 5), carrots(FINE, 1)));
+        rightClick(player, SECOND_INVENTORY_SLOT);
+        helper.assertTrue(player.inventoryMenu.getCarried().isEmpty() && total(player.getInventory().getItem(SECOND_INVENTORY_SLOT)) == 10, "a quality stack that fits entirely should leave the cursor empty");
+        player.inventoryMenu.setCarried(QualityStacks.poolIntoNewQualityStack(stack(Items.POTATO, FINE, 2), stack(Items.POTATO, SUPERIOR, 2)));
+        rightClick(player, SECOND_INVENTORY_SLOT);
+        helper.assertTrue(QualityStacks.contents(player.inventoryMenu.getCarried()).accepts(carrots(null, 1)), "a potato quality stack onto a carrot one should fall back to vanilla's swap");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
     public static void carryingAQualityStackPicksUpAndPutsDownItems(GameTestHelper helper) {
         ServerPlayer player = clickingPlayer(helper);
         player.inventoryMenu.setCarried(QualityStacks.poolIntoNewQualityStack(carrots(FINE, 5), carrots(SUPERIOR, 5)));

@@ -32,6 +32,7 @@ public final class QualityStackClicks {
 
     private static boolean carriedQualityStackClicksSlot(ItemStack qualityStack, Slot slot, Player player, SlotAccess carriedAccess) {
         ItemStack inSlot = slot.getItem();
+        if (QualityStacks.isQualityStack(inSlot)) return carriedQualityStackMergesIntoSlotQualityStack(qualityStack, inSlot, slot, player, carriedAccess);
         if (inSlot.isEmpty()) {
             ItemStack next = QualityStacks.peekNext(qualityStack);
             if (next.isEmpty()) return false;
@@ -50,6 +51,15 @@ public final class QualityStackClicks {
         if (taken.isEmpty()) return true;
         QualityStacks.insert(qualityStack, taken);
         if (!taken.isEmpty()) player.getInventory().placeItemBackInInventory(taken);
+        playSound(player, SoundEvents.BUNDLE_INSERT);
+        return true;
+    }
+
+    private static boolean carriedQualityStackMergesIntoSlotQualityStack(ItemStack carried, ItemStack inSlot, Slot slot, Player player, SlotAccess carriedAccess) {
+        if (!QualityStacks.holdSameItem(carried, inSlot) || !slot.allowModification(player) || slotHoldsLessThanAFullStackOf(slot, QualityStacks.peekNext(inSlot))) return false;
+        if (QualityStacks.moveContents(carried, inSlot) == 0) return true;
+        writeBack(slot, inSlot);
+        carriedAccess.set(carried.isEmpty() ? ItemStack.EMPTY : QualityStacks.collapseToSingleStack(carried, Integer.MAX_VALUE).orElse(carried));
         playSound(player, SoundEvents.BUNDLE_INSERT);
         return true;
     }

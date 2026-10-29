@@ -10,6 +10,8 @@ public final class Config {
 
     public enum TooltipStyle { BOTH, SYMBOLS, TEXT }
 
+    public enum EntityQualityDisplay { NAMETAG, INSPECT, OFF }
+
     private static final ModConfigSpec.Builder COMMON = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.EnumValue<Inheritance> CRAFT_INHERITANCE = COMMON
@@ -32,6 +34,12 @@ public final class Config {
     public static final ModConfigSpec.BooleanValue RECORD_CRAFTER = COMMON
             .comment("Record the crafting player's name on items that receive a quality when crafted.")
             .define("recordCrafter", true);
+
+    public static final ModConfigSpec.EnumValue<Inheritance> BREED_INHERITANCE = COMMON
+            .comment("How a bred animal's quality is derived from its parents when at least one has quality. A parent without quality counts as level 0.",
+                    "HIGHEST/LOWEST take that parent's level, AVERAGE takes the mean level and rolls the fractional part up or down, NONE leaves the baby plain.",
+                    "QualityBreedEvent is posted either way, so another mod can set NONE here and decide the baby's quality itself.")
+            .defineEnum("breedInheritance", Inheritance.AVERAGE);
 
     public static final ModConfigSpec.BooleanValue BROKEN_INSTEAD_OF_DESTROYED = COMMON
             .comment("Quality items that reach zero durability become broken and unusable until repaired instead of being destroyed. Turning this off only affects future breaks: items already broken stay broken until repaired.")
@@ -63,16 +71,29 @@ public final class Config {
     private static final ModConfigSpec.Builder CLIENT = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.BooleanValue SHOW_QUALITY_TOOLTIP = CLIENT
-            .comment("Show the quality tier and crafter lines in item tooltips.")
+            .comment("Show the quality tier and crafter lines in item tooltips, and the tier on mobs and players (see entityQualityDisplay).")
             .define("showQualityTooltip", true);
+
+    public static final ModConfigSpec.BooleanValue SHOW_QUALITY_MARKER = CLIENT
+            .comment("Draw a small star in the tier's colour in the top-left corner of every item with a quality, in inventories and the hotbar. Tiers in hiddenTooltipTiers get none.")
+            .define("showQualityMarker", true);
 
     public static final ModConfigSpec.EnumValue<TooltipStyle> QUALITY_TOOLTIP_STYLE = CLIENT
             .comment("How an item's quality shows in tooltips: BOTH the tier name followed by stars, SYMBOLS the stars alone, or TEXT the name alone.",
                     "Stars are half a star per level above -2, at most five: crude is half a star, standard one star, masterwork three. Tiers at level -2 or below always show their name.")
             .defineEnum("qualityTooltipStyle", TooltipStyle.BOTH);
 
+    public static final ModConfigSpec.EnumValue<EntityQualityDisplay> ENTITY_QUALITY_DISPLAY = CLIENT
+            .comment("How a mob or player's quality shows, in the qualityTooltipStyle: NAMETAG looking at it shows its name and tier above its head,",
+                    "INSPECT sneaking and right-clicking it with an empty main hand shows them above the hotbar, OFF neither.")
+            .defineEnum("entityQualityDisplay", EntityQualityDisplay.NAMETAG);
+
+    public static final ModConfigSpec.BooleanValue SHOW_ENTITY_QUALITY_PARTICLES = CLIENT
+            .comment("Mobs and players whose tier sets a particle_color give off an occasional sparkle in that colour.")
+            .define("showEntityQualityParticles", true);
+
     public static final ModConfigSpec.ConfigValue<List<? extends String>> HIDDEN_TOOLTIP_TIERS = CLIENT
-            .comment("Quality tier ids whose name is left out of item tooltips, e.g. [\"quality_api:standard\"].")
+            .comment("Quality tier ids whose name is left out of item tooltips, slot markers and mob and player labels, e.g. [\"quality_api:standard\"].")
             .defineListAllowEmpty("hiddenTooltipTiers", List.of(), () -> "", entry -> entry instanceof String id && ResourceLocation.tryParse(id) != null);
 
     public static final ModConfigSpec CLIENT_SPEC = CLIENT.build();

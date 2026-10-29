@@ -19,10 +19,14 @@
           { "type": "minecraft:generic.attack_damage", "operation": "add_value", "amount": 4.0 },
           { "type": "minecraft:generic.scale", "operation": "add_value", "amount": 0.25 },
           { "type": "minecraft:player.block_interaction_range", "operation": "add_value", "amount": 2.0 }
-        ]
+        ],
+        "tint": "#FFD54F"
       }
     },
     "minecraft:cow": {
+      "quality_api:crude": {
+        "tint": "#9CCC65"
+      },
       "quality_api:superior": {
         "attributes": [
           { "type": "minecraft:generic.max_health", "operation": "add_value", "amount": 10.0 },
@@ -38,6 +42,9 @@
       }
     },
     "minecraft:zombie": {
+      "quality_api:crude": {
+        "tint": "#FFFFFF"
+      },
       "quality_api:masterwork": {
         "attributes": [
           { "type": "minecraft:generic.max_health", "operation": "add_value", "amount": 30.0 },

@@ -1,5 +1,11 @@
 1.6.0
 ---
+- See an entity's quality without other mods: look at it for a nametag with its tier ("Cow Champion ★★★"), or instead sneak and right-click it with an empty hand to show it above the hotbar. Client config `entityQualityDisplay` picks NAMETAG (default), INSPECT or OFF. `showQualityTooltip` and `hiddenTooltipTiers` apply here too.
+- Tiers can set `particle_color`: mobs and players of that tier sparkle in that colour now and then. Exquisite and masterwork ship with one. Client config `showEntityQualityParticles` turns them off.
+- `entity_qualities` entries can set `tint`: that mob or player is drawn in the colour, for example crude animals green or masterwork players gold. Nothing ships tinted.
+- Right-click a carried quality stack onto another of the same item to pour in what fits; tiers the target already holds go in first.
+- Bred animals inherit quality from their parents: common config `breedInheritance` is AVERAGE (default; mean level, fraction rolled), HIGHEST, LOWEST or NONE. A parent without quality counts as level 0, and two plain parents have a plain baby. `QualityBreedEvent` is posted for every bred baby so mods can decide the tier themselves.
+- Items with a quality show a small star in the tier's colour in the top-left of their slot, so you can tell tiers apart without hovering. Client config `showQualityMarker` turns it off; tiers in `hiddenTooltipTiers` get none.
 - Tooltips can show quality as stars: client config `qualityTooltipStyle` is BOTH (tier name then stars, the default), SYMBOLS (stars only) or TEXT (name only). Stars go up by half a star per level: crude ½, standard 1, fine 1½ up to masterwork 3, in the tier's colour. "Crafted by" now has its own line under the quality.
 
 1.5.0

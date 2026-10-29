@@ -116,6 +116,7 @@ public class QualityAPI {
 
     public static final DataMapType<EntityType<?>, Map<ResourceLocation, EntityQualityEffects>> ENTITY_QUALITIES =
             AdvancedDataMapType.builder(id("entity_qualities"), Registries.ENTITY_TYPE, EntityQualityEffects.OVERRIDES_CODEC)
+                    .synced(EntityQualityEffects.OVERRIDES_CODEC, false)
                     .merger(EntityQualityEffects::mergeOverrides)
                     .build();
 

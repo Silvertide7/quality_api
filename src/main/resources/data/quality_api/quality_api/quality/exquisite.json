@@ -1,6 +1,7 @@
 {
   "level": 3,
   "color": "#17DD62",
+  "particle_color": "#17DD62",
   "weight": 2,
   "effects": {
     "durability_multiplier": 1.45,

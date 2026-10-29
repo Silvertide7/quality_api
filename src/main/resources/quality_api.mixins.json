@@ -9,6 +9,9 @@
     "LivingEntityMixin",
     "PlayerMixin"
   ],
+  "client": [
+    "LivingEntityRendererMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
