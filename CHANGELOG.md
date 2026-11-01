@@ -1,3 +1,3 @@
-1.6.1
+1.6.2
 ---
-- The entity quality label reads "Cow - Common ★": a dash now separates the name from the tier on the nametag and the inspect action bar.
+- The entity quality label shows only the tier ("Common ★") on the nametag and the inspect action bar. A mob named with a name tag, or a player, keeps its name in front: "Bessie - Common ★".

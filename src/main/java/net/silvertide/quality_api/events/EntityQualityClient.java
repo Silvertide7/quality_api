@@ -80,6 +80,8 @@ public final class EntityQualityClient {
         if (tier == null || !Config.SHOW_QUALITY_TOOLTIP.get() || Config.isTierHidden(tier)) return null;
         Quality quality = Qualities.get(tier).orElse(null);
         if (quality == null) return null;
-        return Component.empty().append(name).append(" - ").append(QualityTooltipName.of(Qualities.displayName(entity, tier), quality));
+        Component tierLabel = QualityTooltipName.of(Qualities.displayName(entity, tier), quality);
+        if (!entity.hasCustomName() && !(entity instanceof Player)) return tierLabel;
+        return Component.empty().append(name).append(" - ").append(tierLabel);
     }
 }
