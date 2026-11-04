@@ -15,6 +15,7 @@ import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
+import net.silvertide.quality_api.api.Traits;
 import net.silvertide.quality_api.quality.Quality;
 import net.silvertide.quality_api.quality.QualityTooltipName;
 import net.silvertide.quality_api.quality.Snapshot;
@@ -29,32 +30,39 @@ public final class ClientEvents {
     @SubscribeEvent
     static void onTooltip(ItemTooltipEvent event) {
         ItemStack stack = event.getItemStack();
-        ResourceLocation tier = stack.get(QualityAPI.QUALITY.get());
-        if (tier == null) return;
-        Quality quality = Snapshot.current().tiers().get(tier);
-        if (quality == null) return;
         List<Component> lines = event.getToolTip();
-        boolean broken = Qualities.isBroken(stack);
+        ResourceLocation tier = stack.get(QualityAPI.QUALITY.get());
+        Quality quality = tier == null ? null : Snapshot.current().tiers().get(tier);
+        boolean broken = quality != null && Qualities.isBroken(stack);
         int insertAt = 1;
-        if (Config.SHOW_QUALITY_TOOLTIP.get()) {
-            if (!Config.isTierHidden(tier)) {
-                insertAt = insert(lines, insertAt, QualityTooltipName.of(Qualities.displayName(stack, tier), quality));
-            }
-            String crafter = stack.get(QualityAPI.CRAFTER.get());
-            if (crafter != null) {
-                insertAt = insert(lines, insertAt, Component.translatable("quality_api.tooltip.crafter", crafter).withStyle(ChatFormatting.GRAY));
-            }
-            FoodProperties food = stack.getFoodProperties(event.getEntity());
-            Snapshot.Resolved resolved = food == null ? null : Snapshot.current().resolved(stack.getItem(), tier);
-            if (resolved != null && !broken && resolved.changesFood(food)) {
-                for (Component foodLine : foodLines(resolved, food, event.getContext().tickRate())) {
-                    insertAt = insert(lines, insertAt, foodLine);
-                }
-            }
+        if (quality != null && Config.SHOW_QUALITY_TOOLTIP.get()) {
+            insertAt = insertQualityLines(event, lines, insertAt, tier, quality, broken);
+        }
+        for (Component traitLine : Traits.tooltipLines(stack)) {
+            insertAt = insert(lines, insertAt, traitLine);
         }
         if (broken) {
             insert(lines, insertAt, Component.translatable("quality_api.tooltip.broken").withStyle(ChatFormatting.RED));
         }
+    }
+
+    private static int insertQualityLines(ItemTooltipEvent event, List<Component> lines, int insertAt, ResourceLocation tier, Quality quality, boolean broken) {
+        ItemStack stack = event.getItemStack();
+        if (!Config.isTierHidden(tier)) {
+            insertAt = insert(lines, insertAt, QualityTooltipName.of(Qualities.displayName(stack, tier), quality));
+        }
+        String crafter = stack.get(QualityAPI.CRAFTER.get());
+        if (crafter != null) {
+            insertAt = insert(lines, insertAt, Component.translatable("quality_api.tooltip.crafter", crafter).withStyle(ChatFormatting.GRAY));
+        }
+        FoodProperties food = stack.getFoodProperties(event.getEntity());
+        Snapshot.Resolved resolved = food == null ? null : Snapshot.current().resolved(stack.getItem(), tier);
+        if (resolved != null && !broken && resolved.changesFood(food)) {
+            for (Component foodLine : foodLines(resolved, food, event.getContext().tickRate())) {
+                insertAt = insert(lines, insertAt, foodLine);
+            }
+        }
+        return insertAt;
     }
 
     private static List<Component> foodLines(Snapshot.Resolved resolved, FoodProperties food, float ticksPerSecond) {

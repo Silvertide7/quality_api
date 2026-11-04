@@ -70,6 +70,7 @@ public final class QualityEvents {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     static void onLivingConvert(LivingConversionEvent.Post event) {
         LivingEntity outcome = event.getOutcome();
+        if (outcome.hasData(QualityAPI.ENTITY_TRAITS)) outcome.syncData(QualityAPI.ENTITY_TRAITS);
         if (!outcome.hasData(QualityAPI.ENTITY_QUALITY)) return;
         outcome.syncData(QualityAPI.ENTITY_QUALITY);
         EntityQualityModifiers.refresh(outcome);

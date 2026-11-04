@@ -889,7 +889,7 @@ public class QualityGameTests {
         Snapshot loaded = Snapshot.current();
         Map<Item, Map<ResourceLocation, Snapshot.Resolved>> overrides = new HashMap<>(loaded.overrides());
         overrides.put(item, Map.of(tier, Snapshot.Resolved.of(tier, loaded.tiers().get(tier).effects().patchedWith(patch))));
-        installSnapshot(new Snapshot(loaded.tiers(), loaded.idsByLevel(), loaded.base(), Map.copyOf(overrides), loaded.nameSets(), loaded.entityNameSets(), loaded.entityModifiers(), loaded.entityTints()));
+        installSnapshot(new Snapshot(loaded.tiers(), loaded.idsByLevel(), loaded.base(), Map.copyOf(overrides), loaded.nameSets(), loaded.entityNameSets(), loaded.entityModifiers(), loaded.entityTints(), loaded.traits()));
         try {
             body.run();
         } finally {
@@ -900,7 +900,7 @@ public class QualityGameTests {
     private static Snapshot withEntityAttributes(Snapshot loaded, EntityType<?> type, ResourceLocation tier, List<EntityQualityEffects.EntityAttributeEffect> attributes) {
         Map<EntityType<?>, Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>>> entityModifiers = new HashMap<>(loaded.entityModifiers());
         entityModifiers.put(type, Map.of(tier, Snapshot.entityModifiersOf(tier, new EntityQualityEffects(Optional.of(attributes), Optional.empty()))));
-        return new Snapshot(loaded.tiers(), loaded.idsByLevel(), loaded.base(), loaded.overrides(), loaded.nameSets(), loaded.entityNameSets(), Map.copyOf(entityModifiers), loaded.entityTints());
+        return new Snapshot(loaded.tiers(), loaded.idsByLevel(), loaded.base(), loaded.overrides(), loaded.nameSets(), loaded.entityNameSets(), Map.copyOf(entityModifiers), loaded.entityTints(), loaded.traits());
     }
 
     private static void runCommand(GameTestHelper helper, String command) {

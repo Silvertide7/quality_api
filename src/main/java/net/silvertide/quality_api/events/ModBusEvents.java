@@ -6,6 +6,7 @@ import net.neoforged.neoforge.registries.DataPackRegistryEvent;
 import net.neoforged.neoforge.registries.datamaps.RegisterDataMapTypesEvent;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.quality.Quality;
+import net.silvertide.quality_api.quality.Trait;
 
 @EventBusSubscriber(modid = QualityAPI.MOD_ID)
 public final class ModBusEvents {
@@ -14,6 +15,7 @@ public final class ModBusEvents {
     @SubscribeEvent
     static void registerDatapackRegistries(DataPackRegistryEvent.NewRegistry event) {
         event.dataPackRegistry(QualityAPI.QUALITY_REGISTRY, Quality.CODEC, Quality.CODEC);
+        event.dataPackRegistry(QualityAPI.TRAIT_REGISTRY, Trait.CODEC, Trait.CODEC);
     }
 
     @SubscribeEvent

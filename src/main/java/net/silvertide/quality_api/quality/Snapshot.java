@@ -41,10 +41,11 @@ public record Snapshot(
         Map<Item, String> nameSets,
         Map<EntityType<?>, String> entityNameSets,
         Map<EntityType<?>, Map<ResourceLocation, Multimap<Holder<Attribute>, AttributeModifier>>> entityModifiers,
-        Map<EntityType<?>, Map<ResourceLocation, Integer>> entityTints) {
+        Map<EntityType<?>, Map<ResourceLocation, Integer>> entityTints,
+        Map<ResourceLocation, Trait> traits) {
 
     public static final int UNTINTED = 0xFFFFFFFF;
-    public static final Snapshot EMPTY = new Snapshot(Map.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+    public static final Snapshot EMPTY = new Snapshot(Map.of(), List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
 
     private static volatile Snapshot current = EMPTY;
 
@@ -78,9 +79,17 @@ public record Snapshot(
                 resolveNameSets(items, QualityAPI.NAME_SET),
                 resolveNameSets(entityTypes, QualityAPI.ENTITY_NAME_SET),
                 resolveEntityModifiers(entityTypes, tiers),
-                resolveEntityTints(entityTypes, tiers));
+                resolveEntityTints(entityTypes, tiers),
+                loadTraits(access));
         QualityAPI.LOGGER.info("Loaded {} qualities and {} item overrides", tiers.size(), overrides.size());
         if (!current.entityModifiers().isEmpty()) QualityAPI.LOGGER.info("Loaded entity attribute overrides for {} entity types", current.entityModifiers().size());
+    }
+
+    private static Map<ResourceLocation, Trait> loadTraits(RegistryAccess access) {
+        Map<ResourceLocation, Trait> traits = new HashMap<>();
+        access.registry(QualityAPI.TRAIT_REGISTRY).ifPresent(registry ->
+                registry.entrySet().forEach(entry -> traits.put(entry.getKey().location(), entry.getValue())));
+        return Map.copyOf(traits);
     }
 
     private static Map<Item, Map<ResourceLocation, Resolved>> resolveItemOverrides(Registry<Item> items, Map<ResourceLocation, Quality> tiers) {

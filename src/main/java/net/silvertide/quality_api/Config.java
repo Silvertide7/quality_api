@@ -69,6 +69,11 @@ public final class Config {
                     "Off stops both; quality stacks that already exist can still be emptied and filled by hand, so nothing is trapped.")
             .define("qualityStacks", true);
 
+    public static final ModConfigSpec.BooleanValue CREATE_QUALITY_STACKS_ON_PICKUP = SERVER
+            .comment("Picking up an item that differs only in quality from a stack in your inventory makes a quality stack of the two, when the item has no stack of its own quality with room.",
+                    "Never touches the item in your hand or offhand. Needs qualityStacks on.")
+            .define("createQualityStacksOnPickup", true);
+
     public static final ModConfigSpec SERVER_SPEC = SERVER.build();
 
     private static final ModConfigSpec.Builder CLIENT = new ModConfigSpec.Builder();

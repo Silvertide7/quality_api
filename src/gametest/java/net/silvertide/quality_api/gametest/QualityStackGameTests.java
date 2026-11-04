@@ -36,6 +36,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.silvertide.quality_api.Config;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
+import net.silvertide.quality_api.api.Traits;
 import net.silvertide.quality_api.stack.QualityStackContents;
 import net.silvertide.quality_api.stack.QualityStacks;
 import org.jetbrains.annotations.Nullable;
@@ -59,6 +60,7 @@ public class QualityStackGameTests {
     private static final ResourceLocation REMOVED_TIER = QualityAPI.id("removed_tier");
     private static final int FIRST_INVENTORY_SLOT = 9;
     private static final int SECOND_INVENTORY_SLOT = 10;
+    private static final int HOTBAR_SLOT_NOT_SELECTED = 4;
     private static final int CRAFTING_RESULT_SLOT = 0;
     private static final int PRIMARY_BUTTON = 0;
     private static final int SECONDARY_BUTTON = 1;
@@ -424,6 +426,51 @@ public class QualityStackGameTests {
         justThrown.playerTouch(player);
         helper.assertTrue(justThrown.isAlive() && total(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) == 2, "an item with a pickup delay should not be taken in");
         justThrown.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void pickingUpAnotherQualityPoolsWithALooseStackButNeverTheHeldOne(GameTestHelper helper) {
+        ServerPlayer player = clickingPlayer(helper);
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, carrots(FINE, 10));
+        dropAt(helper, carrots(SUPERIOR, 20)).playerTouch(player);
+        ItemStack pooled = player.getInventory().getItem(FIRST_INVENTORY_SLOT);
+        helper.assertTrue(QualityStacks.isQualityStack(pooled) && total(pooled) == 30 && looseCarrots(player) == 0, "superior carrots should pool with the loose fine ones into a quality stack");
+        player.getInventory().clearContent();
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, carrots(FINE, 60));
+        dropAt(helper, carrots(SUPERIOR, 10)).playerTouch(player);
+        helper.assertTrue(total(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) == CARROT_CAPACITY && looseCarrots(player) == 6, "what does not fit in the new quality stack should be picked up normally");
+        player.getInventory().clearContent();
+        player.getInventory().setItem(player.getInventory().selected, carrots(FINE, 10));
+        dropAt(helper, carrots(SUPERIOR, 5)).playerTouch(player);
+        helper.assertTrue(isCarrots(player.getInventory().getSelected(), FINE, 10) && looseCarrots(player) == 15, "the carrots in hand should never become a quality stack");
+        player.getInventory().clearContent();
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, carrots(FINE, 10));
+        player.getInventory().setItem(SECOND_INVENTORY_SLOT, carrots(SUPERIOR, 10));
+        dropAt(helper, carrots(SUPERIOR, 5)).playerTouch(player);
+        helper.assertTrue(isCarrots(player.getInventory().getItem(SECOND_INVENTORY_SLOT), SUPERIOR, 15) && !QualityStacks.isQualityStack(player.getInventory().getItem(FIRST_INVENTORY_SLOT)), "a stack of the same quality with room should take the pickup normally");
+        player.getInventory().clearContent();
+        player.getInventory().setItem(HOTBAR_SLOT_NOT_SELECTED, carrots(FINE, 10));
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, carrots(FINE, 10));
+        dropAt(helper, carrots(SUPERIOR, 5)).playerTouch(player);
+        helper.assertTrue(QualityStacks.isQualityStack(player.getInventory().getItem(FIRST_INVENTORY_SLOT)) && isCarrots(player.getInventory().getItem(HOTBAR_SLOT_NOT_SELECTED), FINE, 10),
+                "a main inventory stack should be pooled before a hotbar one");
+        player.getInventory().clearContent();
+        ItemStack goldenCarrots = carrots(FINE, 10);
+        Traits.add(goldenCarrots, QualityAPI.id("test_golden"));
+        player.getInventory().setItem(FIRST_INVENTORY_SLOT, goldenCarrots);
+        dropAt(helper, carrots(SUPERIOR, 5)).playerTouch(player);
+        helper.assertFalse(QualityStacks.isQualityStack(player.getInventory().getItem(FIRST_INVENTORY_SLOT)), "carrots with different traits should not pool on pickup");
+        boolean configuredCreateOnPickup = Config.CREATE_QUALITY_STACKS_ON_PICKUP.get();
+        Config.CREATE_QUALITY_STACKS_ON_PICKUP.set(false);
+        try {
+            player.getInventory().clearContent();
+            player.getInventory().setItem(FIRST_INVENTORY_SLOT, carrots(FINE, 10));
+            dropAt(helper, carrots(SUPERIOR, 5)).playerTouch(player);
+            helper.assertTrue(isCarrots(player.getInventory().getItem(FIRST_INVENTORY_SLOT), FINE, 10) && looseCarrots(player) == 15, "with the option off, pickups should not make quality stacks");
+        } finally {
+            Config.CREATE_QUALITY_STACKS_ON_PICKUP.set(configuredCreateOnPickup);
+        }
         helper.succeed();
     }
 

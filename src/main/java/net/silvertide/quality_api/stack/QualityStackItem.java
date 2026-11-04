@@ -12,6 +12,7 @@ import net.minecraft.world.item.ItemUtils;
 import net.minecraft.world.item.TooltipFlag;
 import net.silvertide.quality_api.QualityAPI;
 import net.silvertide.quality_api.api.Qualities;
+import net.silvertide.quality_api.api.Traits;
 import net.silvertide.quality_api.quality.QualityTooltipName;
 
 import java.util.List;
@@ -48,6 +49,7 @@ public class QualityStackItem extends Item {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
         QualityStackContents contents = QualityStacks.contents(stack);
         if (contents == null) return;
+        lines.addAll(Traits.tooltipLines(contents.template()));
         for (QualityStackContents.Entry entry : contents.entriesBestFirst()) {
             lines.add(Component.translatable("quality_api.tooltip.quality_stack.entry", tierName(contents, entry.tier()), entry.count()).withStyle(ChatFormatting.GRAY));
         }

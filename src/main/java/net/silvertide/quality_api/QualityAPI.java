@@ -33,17 +33,20 @@ import net.neoforged.neoforge.registries.datamaps.AdvancedDataMapType;
 import net.neoforged.neoforge.registries.datamaps.DataMapType;
 import net.silvertide.quality_api.compat.AppleSkinCompat;
 import net.silvertide.quality_api.craft.MinQualityIngredient;
+import net.silvertide.quality_api.loot.AddTraitFunction;
 import net.silvertide.quality_api.loot.CopyEntityQualityFunction;
 import net.silvertide.quality_api.loot.EntityMinQualityCondition;
 import net.silvertide.quality_api.loot.RollQualityModifier;
 import net.silvertide.quality_api.quality.EntityQualityEffects;
 import net.silvertide.quality_api.quality.Quality;
 import net.silvertide.quality_api.quality.QualityEffects;
+import net.silvertide.quality_api.quality.Trait;
 import net.silvertide.quality_api.stack.QualityStackContents;
 import net.silvertide.quality_api.stack.QualityStackItem;
 import net.silvertide.quality_api.stack.QualityStackSelection;
 import org.slf4j.Logger;
 
+import java.util.List;
 import java.util.Map;
 
 @Mod(QualityAPI.MOD_ID)
@@ -63,6 +66,11 @@ public class QualityAPI {
             DATA_COMPONENTS.registerComponentType("crafter", builder -> builder
                     .persistent(Codec.STRING)
                     .networkSynchronized(ByteBufCodecs.STRING_UTF8));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<ResourceLocation>>> TRAITS =
+            DATA_COMPONENTS.registerComponentType("traits", builder -> builder
+                    .persistent(Trait.IDS_CODEC)
+                    .networkSynchronized(Trait.IDS_STREAM_CODEC));
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<QualityStackContents>> QUALITY_STACK_CONTENTS =
             DATA_COMPONENTS.registerComponentType("quality_stack_contents", builder -> builder
@@ -89,10 +97,19 @@ public class QualityAPI {
                     .sync(ResourceLocation.STREAM_CODEC)
                     .build());
 
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<List<ResourceLocation>>> ENTITY_TRAITS =
+            ATTACHMENT_TYPES.register("traits", () -> AttachmentType.<List<ResourceLocation>>builder(() -> List.of())
+                    .serialize(Trait.IDS_CODEC)
+                    .copyOnDeath()
+                    .sync(Trait.IDS_STREAM_CODEC)
+                    .build());
+
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<Multimap<Holder<Attribute>, AttributeModifier>>> APPLIED_ENTITY_MODIFIERS =
             ATTACHMENT_TYPES.register("applied_entity_modifiers", () -> AttachmentType.<Multimap<Holder<Attribute>, AttributeModifier>>builder(ImmutableMultimap::of).build());
 
     public static final ResourceKey<Registry<Quality>> QUALITY_REGISTRY = ResourceKey.createRegistryKey(id("quality"));
+
+    public static final ResourceKey<Registry<Trait>> TRAIT_REGISTRY = ResourceKey.createRegistryKey(id("trait"));
 
     public static final DataMapType<Item, Map<ResourceLocation, QualityEffects>> ITEM_QUALITIES =
             AdvancedDataMapType.builder(id("item_qualities"), Registries.ITEM, QualityEffects.OVERRIDES_CODEC)
@@ -128,6 +145,7 @@ public class QualityAPI {
         ATTACHMENT_TYPES.register(modEventBus);
         RollQualityModifier.register(modEventBus);
         CopyEntityQualityFunction.register(modEventBus);
+        AddTraitFunction.register(modEventBus);
         EntityMinQualityCondition.register(modEventBus);
         MinQualityIngredient.register(modEventBus);
         AppleSkinCompat.registerIfLoaded();
