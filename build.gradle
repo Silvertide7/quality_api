@@ -137,6 +137,8 @@ dependencies {
     compileOnly "curse.maven:silverlib-1691772:${silverlib_version}"
     localRuntime "curse.maven:silverlib-1691772:${silverlib_version}"
     compileOnly "curse.maven:appleskin-248787:${appleskin_version}"
+    compileOnly "curse.maven:farmers-delight-398521:${farmers_delight_version}"
+    localRuntime "curse.maven:farmers-delight-398521:${farmers_delight_version}"
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"

@@ -26,6 +26,11 @@ public final class Config {
             .comment("Only crafted results with durability inherit quality from ingredients. Off lets planks, sticks and other stackables carry quality too.")
             .define("craftInheritanceDamageableOnly", true);
 
+    public static final ModConfigSpec.BooleanValue STATION_INHERITANCE_DAMAGEABLE_ONLY = COMMON
+            .comment("Only results with durability inherit quality in furnaces, smokers, blast furnaces, campfires and Farmer's Delight stations.",
+                    "Off by default, so cooked food and smelted ingots carry the quality of what went in.")
+            .define("stationInheritanceDamageableOnly", false);
+
     public static final ModConfigSpec.DoubleValue DOWNGRADE_CHANCE = COMMON
             .comment("Chance that an inherited or rolled crafting quality drops one tier.")
             .defineInRange("downgradeChance", 0.0, 0.0, 1.0);

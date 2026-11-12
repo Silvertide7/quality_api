@@ -4,10 +4,15 @@
   "package": "net.silvertide.quality_api.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "AbstractFurnaceBlockEntityMixin",
+    "AbstractFurnaceMenuMixin",
+    "CampfireBlockEntityMixin",
     "CraftingMenuMixin",
+    "FurnaceResultSlotMixin",
     "ItemStackMixin",
     "LivingEntityMixin",
-    "PlayerMixin"
+    "PlayerMixin",
+    "ServerPlaceRecipeMixin"
   ],
   "client": [
     "LivingEntityRendererMixin"

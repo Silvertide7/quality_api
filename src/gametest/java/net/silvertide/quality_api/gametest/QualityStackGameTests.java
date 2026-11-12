@@ -77,7 +77,7 @@ public class QualityStackGameTests {
         helper.assertFalse(QualityStacks.canPool(carrots(FINE, 1), stack(Items.POTATO, FINE, 1)), "different items should not pool");
         helper.assertFalse(QualityStacks.canPool(renamedCarrot, carrots(FINE, 1)), "a renamed carrot should not pool with a plain-named one");
         helper.assertFalse(QualityStacks.canPool(stack(Items.IRON_SWORD, FINE, 1), stack(Items.IRON_SWORD, SUPERIOR, 1)), "damageable items should not pool");
-        helper.assertFalse(QualityStacks.canPool(stack(Items.MUSHROOM_STEW, FINE, 1), stack(Items.MUSHROOM_STEW, SUPERIOR, 1)), "unstackable items should not pool");
+        helper.assertFalse(QualityStacks.canPool(stack(Items.CAKE, FINE, 1), stack(Items.CAKE, SUPERIOR, 1)), "unstackable items should not pool");
         helper.assertFalse(QualityStacks.canPool(QualityStacks.poolIntoNewQualityStack(carrots(FINE, 1), carrots(SUPERIOR, 1)), carrots(FINE, 1)), "a quality stack should not pool as an item");
         helper.succeed();
     }

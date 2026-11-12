@@ -1,0 +1,19 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "net.silvertide.quality_api.mixin.farmersdelight",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "AbstractStoveBlockEntityMixin",
+    "CookingPotBlockEntityMixin",
+    "CookingPotBlockMixin",
+    "CookingPotMenuMixin",
+    "CookingPotResultSlotMixin",
+    "CuttingBoardBlockEntityMixin",
+    "SkilletBlockEntityMixin",
+    "SkilletItemMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

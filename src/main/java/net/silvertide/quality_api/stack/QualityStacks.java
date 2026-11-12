@@ -46,6 +46,19 @@ public final class QualityStacks {
         return moved;
     }
 
+    public static boolean replaceContents(ItemStack qualityStack, List<ItemStack> stacks) {
+        QualityStackContents contents = contents(qualityStack);
+        if (contents == null || stacks.isEmpty() || !stacks.stream().allMatch(QualityStackContents::isPoolable)) return false;
+        QualityStackContents replaced = QualityStackContents.emptyFor(stacks.getFirst());
+        for (ItemStack stack : stacks) {
+            if (!replaced.accepts(stack) || replaced.total() + stack.getCount() > replaced.capacity()) return false;
+            replaced = replaced.plus(tierOf(stack), stack.getCount());
+        }
+        qualityStack.set(QualityAPI.QUALITY_STACK_CONTENTS.get(), replaced);
+        clearSelectionIfNoLongerHeld(qualityStack);
+        return true;
+    }
+
     public static boolean holdSameItem(ItemStack firstQualityStack, ItemStack secondQualityStack) {
         QualityStackContents first = contents(firstQualityStack);
         QualityStackContents second = contents(secondQualityStack);

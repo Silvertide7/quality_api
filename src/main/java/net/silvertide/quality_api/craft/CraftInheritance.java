@@ -20,6 +20,7 @@ import net.silvertide.quality_api.api.Qualities;
 import net.silvertide.quality_api.api.QualityCraftEvent;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
@@ -49,7 +50,7 @@ public final class CraftInheritance {
                 ? rollIfConfigured(result, random)
                 : chooseFromIngredients(input, meanLevel.getAsDouble(), result, random);
         if (base == null) return null;
-        if (!Qualities.canApply(result, base)) base = Qualities.forLevel(result, Qualities.levelOf(base)).orElse(null);
+        base = nearestTierTheResultCanTake(result, base);
         if (base != null && random.nextDouble() < Config.DOWNGRADE_CHANCE.get()) base = Qualities.shift(result, base, -1).orElse(base);
         return base;
     }
@@ -62,7 +63,7 @@ public final class CraftInheritance {
 
     @Nullable
     private static ResourceLocation chooseFromIngredients(CraftingInput input, double meanLevel, ItemStack result, RandomSource random) {
-        IngredientTiers tiers = IngredientTiers.of(input);
+        IngredientTiers tiers = IngredientTiers.of(input.items());
         return switch (Config.CRAFT_INHERITANCE.get()) {
             case HIGHEST -> tiers.highest();
             case LOWEST -> tiers.lowest();
@@ -71,12 +72,12 @@ public final class CraftInheritance {
         };
     }
 
-    private record IngredientTiers(@Nullable ResourceLocation highest, @Nullable ResourceLocation lowest) {
-        static IngredientTiers of(CraftingInput input) {
+    record IngredientTiers(@Nullable ResourceLocation highest, @Nullable ResourceLocation lowest) {
+        static IngredientTiers of(List<ItemStack> ingredients) {
             ResourceLocation highest = null;
             ResourceLocation lowest = null;
-            for (int slot = 0; slot < input.size(); slot++) {
-                Optional<ResourceLocation> tier = Qualities.getId(input.getItem(slot));
+            for (ItemStack ingredient : ingredients) {
+                Optional<ResourceLocation> tier = Qualities.getId(ingredient);
                 if (tier.isEmpty()) continue;
                 int level = Qualities.levelOf(tier.get());
                 if (highest == null || level > Qualities.levelOf(highest)) highest = tier.get();
@@ -84,6 +85,11 @@ public final class CraftInheritance {
             }
             return new IngredientTiers(highest, lowest);
         }
+    }
+
+    @Nullable
+    static ResourceLocation nearestTierTheResultCanTake(ItemStack result, ResourceLocation tier) {
+        return Qualities.canApply(result, tier) ? tier : Qualities.forLevel(result, Qualities.levelOf(tier)).orElse(null);
     }
 
     @Nullable

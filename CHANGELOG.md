@@ -1,10 +1,13 @@
-1.7.0
+1.8.0
 ---
-- Traits: named flags that other mods and datapacks can put on items and entities. QualityAPI stores, syncs and shows them; the mod or pack that adds a trait decides what it does.
-  - Define a trait with a datapack file at `data/<namespace>/quality_api/trait/<name>.json`, e.g. `{ "color": "#FFAA00" }`, and name it with the lang key `trait.<namespace>.<name>`.
-  - Items keep them in the `quality_api:traits` component, e.g. `/give @s minecraft:carrot[quality_api:traits=["mypack:golden"]]`. Entities keep them through death and conversion.
-  - Tooltips show them on one line, "Traits: Golden, Fiery", four per line. Quality stacks list the traits of what they hold.
-  - Items with the same traits stack and pool into quality stacks across tiers; items with different traits stay apart.
-  - Loot function `quality_api:add_trait` (`trait`), pair it with `random_chance` for rare drops.
-  - Mods use `Traits` (`add`, `remove`, `has`, `getIds`, `displayName`, `tooltipLines`, for stacks and entities). Crafting, breeding and loot carry no traits over on their own; the owning mod decides that.
-- Picking up an item that differs only in quality from a stack in your inventory now makes a quality stack of the two, so mixed-quality crops collect into one slot on their own. Server config `createQualityStacksOnPickup` (default on). It never touches the item in your hand or offhand, and a stack of the same quality with room still takes the pickup normally.
+- Quality now carries through cooking and smelting. The furnace, smoker, blast furnace and campfire pass the quality of what went in to what comes out, and with Farmer's Delight installed so do the cooking pot, stove, skillet and cutting board.
+  - Results follow `craftInheritance`, with AVERAGE rounded instead of rolled so one batch always stacks.
+  - New config `stationInheritanceDamageableOnly` (default off) decides whether only results with durability inherit at stations. `craftInheritanceDamageableOnly` now covers the crafting table only, so cooked food and ingots inherit by default while planks and sticks still do not.
+  - The player who takes a result by hand is recorded as the crafter of a result that has a quality. Hoppers and other automation record nobody.
+  - A result slot refuses pickup while the cursor holds something, and shift-click needs an empty inventory slot.
+- When a furnace or cooking pot makes a result of a different quality from the one already in its output, the two pool into a quality stack there instead of the station stopping. Needs `qualityStacks` on. Hoppers move the pooled result as one quality stack.
+  - The crafter is recorded on a pooled result only when everything in it has a quality.
+  - Other mods that react to smelting see the pooled result as one quality stack item.
+  - With `qualityStacks` off, a station waits until the output is emptied before making a result of another quality. The cooking pot also waits while a meal of the old quality is still inside it, for example when it is out of bowls.
+- For mods: `QualityProcessEvent` (a station made a result: level, station position, ingredients, result, ingredient mean level, proposed tier, `setQuality`) and `QualityResultTakenEvent` (a player took a result: player, stack, tier, `setQuality`; once per tier for a pooled result). `QualityProcessEvent` listeners must give the same tier for the same ingredients, since stations check a result before making it.
+- Farmer's Delight is optional, 1.3.3 or newer; its hooks load only when it is installed. They are tested against 1.3.3, and a later Farmer's Delight update that changes the code they attach to can stop the game at startup until QualityAPI is updated.

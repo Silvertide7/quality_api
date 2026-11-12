@@ -50,12 +50,18 @@ import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.SimpleContainerData;
+import net.minecraft.world.inventory.SmokerMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.SmokerBlockEntity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
@@ -74,6 +80,9 @@ import net.silvertide.quality_api.api.QualityFoodEatenEvent;
 import net.silvertide.quality_api.api.QualityItemBrokenEvent;
 import net.silvertide.quality_api.api.QualityLootEvent;
 import net.silvertide.quality_api.craft.MinQualityIngredient;
+import net.silvertide.quality_api.stack.QualityStackContents;
+import net.silvertide.quality_api.stack.QualityStacks;
+import net.silvertide.quality_api.craft.StationQuality;
 import net.silvertide.quality_api.quality.EntityQualityEffects;
 import net.silvertide.quality_api.quality.EntityQualityModifiers;
 import net.silvertide.quality_api.quality.Quality;
@@ -81,6 +90,8 @@ import net.silvertide.quality_api.quality.QualityTooltipName;
 import net.silvertide.quality_api.quality.QualityEffects;
 import net.silvertide.quality_api.quality.Snapshot;
 import org.jetbrains.annotations.Nullable;
+
+import vectorwing.farmersdelight.common.block.entity.CookingPotBlockEntity;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -369,18 +380,142 @@ public class QualityGameTests {
 
     @GameTest(template = EMPTY)
     public static void craftingInheritsHighestAndSurvivesShiftClick(GameTestHelper helper) {
+        Config.Inheritance previous = Config.CRAFT_INHERITANCE.get();
+        Config.CRAFT_INHERITANCE.set(Config.Inheritance.HIGHEST);
+        try {
+            ServerPlayer player = mockServerPlayer(helper);
+            CraftingMenu menu = openCraftingMenu(helper, player);
+            placeSwordRecipe(menu, FINE, MASTERWORK);
+
+            ItemStack preview = menu.getSlot(0).getItem();
+            helper.assertTrue(preview.is(Items.IRON_SWORD), "preview is not a sword");
+            helper.assertTrue(MASTERWORK.equals(Qualities.getId(preview).orElse(null)), "preview should inherit masterwork");
+            helper.assertTrue(player.getGameProfile().getName().equals(preview.get(QualityAPI.CRAFTER.get())), "crafter not recorded");
+
+            menu.quickMoveStack(player, 0);
+            ItemStack crafted = findInInventory(player, Items.IRON_SWORD);
+            helper.assertTrue(crafted != null && MASTERWORK.equals(Qualities.getId(crafted).orElse(null)), "shift-clicked sword lost its quality");
+        } finally {
+            Config.CRAFT_INHERITANCE.set(previous);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void stationRoundsTheMeanAndRecordsTheTaker(GameTestHelper helper) {
+        Config.Inheritance previous = Config.CRAFT_INHERITANCE.get();
+        Config.CRAFT_INHERITANCE.set(Config.Inheritance.AVERAGE);
+        try {
+            ItemStack result = StationQuality.decide(helper.getLevel(), helper.absolutePos(BlockPos.ZERO),
+                    List.of(withQuality(Items.IRON_SWORD, FINE), withQuality(Items.IRON_SWORD, SUPERIOR), new ItemStack(Items.STICK)),
+                    new ItemStack(Items.IRON_SWORD));
+            helper.assertTrue(SUPERIOR.equals(Qualities.getId(result).orElse(null)), "a 1.5 mean should round to superior, was " + Qualities.getId(result));
+
+            ServerPlayer player = mockServerPlayer(helper);
+            StationQuality.taken(player, result);
+            helper.assertTrue(SUPERIOR.equals(Qualities.getId(result).orElse(null)), "taking without a listener should keep the quality");
+            helper.assertTrue(player.getGameProfile().getName().equals(result.get(QualityAPI.CRAFTER.get())), "taker not recorded as crafter");
+        } finally {
+            Config.CRAFT_INHERITANCE.set(previous);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void smokerCarriesQualityToTheResultAndShiftClickRecordsTheTaker(GameTestHelper helper) {
+        SmokerBlockEntity smoker = smokerThatSmokedTwoFineSteaksOnto(helper, ItemStack.EMPTY);
+        ItemStack smoked = smoker.getItem(2);
+        helper.assertTrue(smoked.is(Items.COOKED_BEEF) && smoked.getCount() == 2, "two fine steaks should stack in the output, was " + smoked);
+        helper.assertTrue(FINE.equals(Qualities.getId(smoked).orElse(null)), "smoked beef lost its quality");
+        helper.assertTrue(!smoked.has(QualityAPI.CRAFTER.get()), "nobody has taken the result yet");
+
         ServerPlayer player = mockServerPlayer(helper);
-        CraftingMenu menu = openCraftingMenu(helper, player);
-        placeSwordRecipe(menu, FINE, MASTERWORK);
+        new SmokerMenu(1, player.getInventory(), smoker, new SimpleContainerData(4)).quickMoveStack(player, 2);
+        ItemStack taken = findInInventory(player, Items.COOKED_BEEF);
+        helper.assertTrue(taken != null && taken.getCount() == 2 && FINE.equals(Qualities.getId(taken).orElse(null)), "shift-clicked steaks lost their quality");
+        helper.assertTrue(player.getGameProfile().getName().equals(taken.get(QualityAPI.CRAFTER.get())), "taker not recorded as crafter");
+        helper.succeed();
+    }
 
-        ItemStack preview = menu.getSlot(0).getItem();
-        helper.assertTrue(preview.is(Items.IRON_SWORD), "preview is not a sword");
-        helper.assertTrue(MASTERWORK.equals(Qualities.getId(preview).orElse(null)), "preview should inherit masterwork");
-        helper.assertTrue(player.getGameProfile().getName().equals(preview.get(QualityAPI.CRAFTER.get())), "crafter not recorded");
+    @GameTest(template = EMPTY)
+    public static void smokerPoolsAResultOfAnotherQualityAndTakingItRecordsTheTaker(GameTestHelper helper) {
+        SmokerBlockEntity smoker = smokerThatSmokedTwoFineSteaksOnto(helper, withQuality(Items.COOKED_BEEF, SUPERIOR));
+        QualityStackContents pooled = QualityStacks.contents(smoker.getItem(2));
+        helper.assertTrue(pooled != null && pooled.entries().equals(List.of(new QualityStackContents.Entry(Optional.of(FINE), 2), new QualityStackContents.Entry(Optional.of(SUPERIOR), 1))),
+                "the output should pool one superior and two fine steaks, was " + smoker.getItem(2) + " " + pooled);
+        helper.assertTrue(smoker.getItem(0).isEmpty(), "both raw steaks should be used up");
 
-        menu.quickMoveStack(player, 0);
-        ItemStack crafted = findInInventory(player, Items.IRON_SWORD);
-        helper.assertTrue(crafted != null && MASTERWORK.equals(Qualities.getId(crafted).orElse(null)), "shift-clicked sword lost its quality");
+        ServerPlayer player = mockServerPlayer(helper);
+        new SmokerMenu(1, player.getInventory(), smoker, new SimpleContainerData(4)).quickMoveStack(player, 2);
+        ItemStack taken = findInInventory(player, QualityAPI.QUALITY_STACK.get());
+        helper.assertTrue(taken != null && QualityStacks.contents(taken).total() == 3, "the pooled steaks should move to the inventory together");
+        ItemStack best = QualityStacks.peekNext(taken);
+        helper.assertTrue(SUPERIOR.equals(Qualities.getId(best).orElse(null)) && player.getGameProfile().getName().equals(best.get(QualityAPI.CRAFTER.get())),
+                "taker not recorded as crafter of the pooled steaks, was " + best);
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void takingPooledResultsThatIncludePlainOnesRecordsNoCrafter(GameTestHelper helper) {
+        SmokerBlockEntity smoker = smokerThatSmokedTwoFineSteaksOnto(helper, new ItemStack(Items.COOKED_BEEF));
+        ServerPlayer player = mockServerPlayer(helper);
+        new SmokerMenu(1, player.getInventory(), smoker, new SimpleContainerData(4)).quickMoveStack(player, 2);
+        ItemStack taken = findInInventory(player, QualityAPI.QUALITY_STACK.get());
+        QualityStackContents pooled = taken == null ? null : QualityStacks.contents(taken);
+        helper.assertTrue(pooled != null && pooled.entries().equals(List.of(new QualityStackContents.Entry(Optional.empty(), 1), new QualityStackContents.Entry(Optional.of(FINE), 2))),
+                "one plain and two fine steaks should be taken together, was " + pooled);
+        helper.assertTrue(!QualityStacks.peekNext(taken).has(QualityAPI.CRAFTER.get()), "a crafter would split the plain steaks from the fine ones");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void cookingPotPoolsAMealOfAnotherQualityIntoItsOutput(GameTestHelper helper) {
+        BlockPos potPos = new BlockPos(0, 1, 0);
+        helper.setBlock(potPos, BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("farmersdelight", "cooking_pot")));
+        CookingPotBlockEntity cookingPot = helper.getBlockEntity(potPos);
+        cookingPot.getInventory().setStackInSlot(CookingPotBlockEntity.MEAL_DISPLAY_SLOT, withQuality(Items.COOKED_BEEF, FINE).copyWithCount(2));
+        cookingPot.getInventory().setStackInSlot(CookingPotBlockEntity.OUTPUT_SLOT, new ItemStack(Items.COOKED_BEEF));
+
+        CookingPotBlockEntity.cookingTick(helper.getLevel(), helper.absolutePos(potPos), cookingPot.getBlockState(), cookingPot);
+
+        QualityStackContents pooled = QualityStacks.contents(cookingPot.getInventory().getStackInSlot(CookingPotBlockEntity.OUTPUT_SLOT));
+        helper.assertTrue(pooled != null && pooled.entries().equals(List.of(new QualityStackContents.Entry(Optional.empty(), 1), new QualityStackContents.Entry(Optional.of(FINE), 2))),
+                "the output should pool one plain and two fine meals, was " + pooled);
+        helper.assertTrue(cookingPot.getMeal().isEmpty(), "the meal should have left the pot");
+        helper.succeed();
+    }
+
+    private static SmokerBlockEntity smokerThatSmokedTwoFineSteaksOnto(GameTestHelper helper, ItemStack alreadyInOutput) {
+        BlockPos smokerPos = new BlockPos(0, 1, 0);
+        helper.setBlock(smokerPos, Blocks.SMOKER);
+        SmokerBlockEntity smoker = helper.getBlockEntity(smokerPos);
+        smoker.setItem(0, withQuality(Items.BEEF, FINE).copyWithCount(2));
+        smoker.setItem(1, new ItemStack(Items.COAL));
+        smoker.setItem(2, alreadyInOutput);
+        int ticksToSmokeTwoSteaks = 220;
+        for (int tick = 0; tick < ticksToSmokeTwoSteaks; tick++) {
+            AbstractFurnaceBlockEntity.serverTick(helper.getLevel(), helper.absolutePos(smokerPos), smoker.getBlockState(), smoker);
+        }
+        return smoker;
+    }
+
+    @GameTest(template = EMPTY)
+    public static void recipeBookClickThatEmptiesTheSmokerRecordsTheTaker(GameTestHelper helper) {
+        BlockPos smokerPos = new BlockPos(0, 1, 0);
+        helper.setBlock(smokerPos, Blocks.SMOKER);
+        SmokerBlockEntity smoker = helper.getBlockEntity(smokerPos);
+        smoker.setItem(2, withQuality(Items.COOKED_BEEF, FINE));
+        ServerPlayer player = mockServerPlayer(helper);
+        RecipeHolder<?> smokingRecipeThePlayerLacksIngredientsFor = helper.getLevel().getRecipeManager()
+                .byKey(ResourceLocation.withDefaultNamespace("cooked_beef_from_smoking")).orElseThrow();
+        player.getRecipeBook().add(smokingRecipeThePlayerLacksIngredientsFor);
+
+        new SmokerMenu(1, player.getInventory(), smoker, new SimpleContainerData(4)).handlePlacement(false, smokingRecipeThePlayerLacksIngredientsFor, player);
+
+        ItemStack taken = findInInventory(player, Items.COOKED_BEEF);
+        helper.assertTrue(smoker.getItem(2).isEmpty() && taken != null, "the recipe book click should move the result to the inventory");
+        helper.assertTrue(FINE.equals(Qualities.getId(taken).orElse(null)), "moved steak lost its quality");
+        helper.assertTrue(player.getGameProfile().getName().equals(taken.get(QualityAPI.CRAFTER.get())), "taker not recorded as crafter");
         helper.succeed();
     }
 
